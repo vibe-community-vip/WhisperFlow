@@ -8,12 +8,17 @@ Diferencias visuales frente a Windows (aceptadas en el plan):
   - **Sí usa ``-alpha``**: el problema de ClearType que en Windows obliga a evitar
     ``-alpha`` NO aplica en Mac, así que la transparencia es segura.
 
-No robar foco: intento best-effort vía pyobjc (NSPanel/level); si pyobjc falla, igual
-funciona pero puede activarse al hacer clic. REQUIERE ajuste/verificación en Mac real.
+THREADING (importante, descubierto al probar en Mac real): en macOS, ``tk.Tk()``
+**debe crearse en el hilo principal y ANTES de que pystray inicialice NSApplication**;
+si pystray (o cualquier Cocoa) la inicializa primero, Tk crashea con
+``-[NSApplication macOSVersion]: unrecognized selector``. Por eso este backend:
+  - ``start()`` crea el Tk en el hilo que lo llama (debe ser el principal), sin arrancar
+    el mainloop. Se llama desde ``Application.__init__`` (hilo principal), antes de pystray.
+  - ``run_mainloop()`` corre ``root.mainloop()`` (bloquea el hilo principal). Lo llama
+    ``app.run()`` en macOS, mientras pystray corre ``run_detached()`` en su propio hilo.
 """
 import math
 import queue as _queue
-import threading
 
 from whisperflow.core import overlay_base as ob
 from whisperflow.core import recorder
@@ -22,11 +27,15 @@ from whisperflow.core import recorder
 class MacOSOverlayBackend(ob.OverlayBackend):
     def __init__(self):
         self._queue = _queue.Queue()
-        self._thread = None
+        self._root = None
 
     def start(self):
-        self._thread = threading.Thread(target=self._run, daemon=True)
-        self._thread.start()
+        # Crea el Tk en el hilo que llama (principal). No arranca mainloop todavía.
+        self._build()
+
+    def run_mainloop(self):
+        if self._root is not None:
+            self._root.mainloop()
 
     def show(self, state, profile=None):
         self._queue.put(("show", (state, profile)))
@@ -37,7 +46,7 @@ class MacOSOverlayBackend(ob.OverlayBackend):
     def stop(self):
         pass  # daemon + os._exit(0)
 
-    def _run(self):
+    def _build(self):
         import tkinter as tk
 
         root = tk.Tk()
@@ -52,7 +61,6 @@ class MacOSOverlayBackend(ob.OverlayBackend):
         sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
         root.geometry(f"{W}x{H}+{(sw - W) // 2}+{sh - 110}")
 
-        # Barra oscura (sin transparentcolor: el fondo es el color de la píldora).
         bg = "#232328"
         root.config(bg=bg)
         canvas = tk.Canvas(root, width=W, height=H, bg=bg, highlightthickness=0)
@@ -75,17 +83,6 @@ class MacOSOverlayBackend(ob.OverlayBackend):
             bar_items.append(item)
 
         root.update_idletasks()
-        # Best-effort: poner la ventana por encima y no activable vía pyobjc.
-        try:
-            import AppKit
-            # El NSWindow del toplevel de Tk: subimos por la cadena de views.
-            # (Esto es lo más frágil del backend Mac; si falla, se atrapa y sigue.)
-            nswin = AppKit.NSApp.mainWindow()
-            # No es fiable obtener el NSWindow exacto de Tk sin más bridging; dejamos
-            # que -topmost haga el trabajo. Ajustar en Mac real si roba foco.
-        except Exception:
-            pass
-
         root.withdraw()
         visible = False
         current_state = "recording"
@@ -140,4 +137,4 @@ class MacOSOverlayBackend(ob.OverlayBackend):
             root.after(40, poll)
 
         root.after(40, poll)
-        root.mainloop()
+        self._root = root

@@ -61,3 +61,8 @@ class OverlayBackend(ABC):
     def hide(self) -> None: ...
     @abstractmethod
     def stop(self) -> None: ...
+
+    def run_mainloop(self) -> None:
+        """Solo backends donde el loop de UI debe correr en el hilo principal
+        (macOS: Tk exige el hilo principal y arrancar ANTES que pystray). Default: no-op."""
+        pass

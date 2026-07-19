@@ -262,10 +262,22 @@ class Application:
     def run(self):
         self.setup_hotkeys()
         self.icon = tray.build_icon("WhisperFlow local (cargando modelo…)", self.on_quit)
+        if sys.platform == "darwin":
+            # macOS: el overlay ya creó Tk en el hilo principal (desde __init__). pystray
+            # va detached en su hilo DESPUÉS de Tk, y el hilo principal queda en el mainloop
+            # de Tk. Si pystray inicializara NSApplication antes que Tk, este crashea con
+            # '-[NSApplication macOSVersion]: unrecognized selector' (verificado en Mac real).
+            try:
+                self.icon.run_detached()
+            except Exception as e:
+                print(f"[whisperflow] no se pudo iniciar la bandeja en Mac: {e}", flush=True)
         threading.Thread(target=self._load_model_in_background, daemon=True).start()
         print("[whisperflow] listo. Ctrl+Win = push-to-talk. Ctrl+Win+Espacio = manos libres.",
               flush=True)
-        tray.run_icon(self.icon)
+        if sys.platform == "darwin":
+            self.overlay.run_mainloop()
+        else:
+            tray.run_icon(self.icon)
 
 
 def main():
