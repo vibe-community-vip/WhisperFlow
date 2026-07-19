@@ -1,16 +1,27 @@
+# Dependencias multiplataforma (se instalan en todas las plataformas).
 faster-whisper
-keyboard
 sounddevice
 numpy
 pyperclip
 pystray
 pillow
-pywin32
 openai
-winshell
+# Linux (X11) y Windows usan la lib "keyboard" para hotkeys globales.
+keyboard ; sys_platform == "win32" or sys_platform == "linux"
 
-# Aceleración por GPU NVIDIA (opcional). Si no tienes GPU NVIDIA o prefieres no
-# instalarlas, bórralas: whisperflow.py detecta que faltan y usa CPU automáticamente
-# (más lento, pero funciona igual).
-nvidia-cublas-cu12
-nvidia-cudnn-cu12
+# --- Específicas por SO (marcadores PEP 508: pip instala solo las que corresponden) ---
+
+# Windows
+pywin32 ; sys_platform == "win32"
+winshell ; sys_platform == "win32"
+
+# macOS
+pynput ; sys_platform == "darwin"
+pyobjc-core ; sys_platform == "darwin"
+pyobjc-framework-Cocoa ; sys_platform == "darwin"
+pyobjc-framework-Quartz ; sys_platform == "darwin"
+
+# Aceleración por GPU NVIDIA (opcional). En Mac no aplica (Apple Silicon => CPU).
+# Sin GPU NVIDIA o si prefieres no instalarlas, bórralas: faster-whisper cae a CPU.
+nvidia-cublas-cu12 ; sys_platform != "darwin"
+nvidia-cudnn-cu12 ; sys_platform != "darwin"

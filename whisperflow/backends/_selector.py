@@ -18,7 +18,21 @@ def select_backends():
             "paste": WindowsPasteBackend,
             "hotkey": WindowsHotkeyBackend,
         }
+    if sys.platform == "darwin":
+        # Fase 4: REQUIERE verificación en Mac real (pyobjc/pynput + permisos).
+        from .macos.beep import MacOSBeepBackend
+        from .macos.overlay import MacOSOverlayBackend
+        from .macos.paste import MacOSPasteBackend
+        from .macos.hotkey import MacOSHotkeyBackend
+        from .macos.startup_init import apply_startup_init
+        return {
+            "startup_init": apply_startup_init,
+            "beep": MacOSBeepBackend,
+            "overlay": MacOSOverlayBackend,
+            "paste": MacOSPasteBackend,
+            "hotkey": MacOSHotkeyBackend,
+        }
     raise NotImplementedError(
         f"Plataforma '{sys.platform}' no soportada todavía "
-        f"(Fase 4: macOS, Fase 6: Linux)."
+        f"(Fase 6: Linux)."
     )
