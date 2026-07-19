@@ -38,7 +38,20 @@ def select_backends():
             "paste": MacOSPasteBackend,
             "hotkey": hotkey_cls,
         }
+    if sys.platform.startswith("linux"):
+        # Fase 6: X11 con soporte; Wayland best-effort. Requiere verificación en Linux real.
+        from .linux.beep import LinuxBeepBackend
+        from .linux.overlay import LinuxOverlayBackend
+        from .linux.paste import LinuxPasteBackend
+        from .linux.hotkey import LinuxHotkeyBackend
+        from .linux.startup_init import apply_startup_init
+        return {
+            "startup_init": apply_startup_init,
+            "beep": LinuxBeepBackend,
+            "overlay": LinuxOverlayBackend,
+            "paste": LinuxPasteBackend,
+            "hotkey": LinuxHotkeyBackend,
+        }
     raise NotImplementedError(
-        f"Plataforma '{sys.platform}' no soportada todavía "
-        f"(Fase 6: Linux)."
+        f"Plataforma '{sys.platform}' no soportada."
     )
