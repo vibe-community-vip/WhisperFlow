@@ -19,18 +19,24 @@ def select_backends():
             "hotkey": WindowsHotkeyBackend,
         }
     if sys.platform == "darwin":
-        # Fase 4: REQUIERE verificación en Mac real (pyobjc/pynput + permisos).
+        # Fase 4/5: REQUIEREN verificación en Mac real (pyobjc/pynput + permisos).
+        from whisperflow.core import config
         from .macos.beep import MacOSBeepBackend
         from .macos.overlay import MacOSOverlayBackend
         from .macos.paste import MacOSPasteBackend
-        from .macos.hotkey import MacOSHotkeyBackend
         from .macos.startup_init import apply_startup_init
+        if config.MAC_HOTKEY == "cgevent":
+            from .macos.hotkey_cgevent import CGEventTapHotkeyBackend
+            hotkey_cls = CGEventTapHotkeyBackend
+        else:
+            from .macos.hotkey import MacOSHotkeyBackend
+            hotkey_cls = MacOSHotkeyBackend
         return {
             "startup_init": apply_startup_init,
             "beep": MacOSBeepBackend,
             "overlay": MacOSOverlayBackend,
             "paste": MacOSPasteBackend,
-            "hotkey": MacOSHotkeyBackend,
+            "hotkey": hotkey_cls,
         }
     raise NotImplementedError(
         f"Plataforma '{sys.platform}' no soportada todavía "

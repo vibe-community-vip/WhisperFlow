@@ -69,3 +69,8 @@ OPENAI_API_KEY = get("OPENAI_API_KEY", "")
 
 # --- Debug ---
 DEBUG = get_bool("WHISPERFLOW_DEBUG", False)
+
+# --- Mac: backend de hotkeys (Fase 5) ---
+# pynput = estable, sin supresión de tone-keys. cgevent = nativo, SUPRIME tone-keys
+# (experimental, requiere Accesibilidad + Supervisión de entrada).
+MAC_HOTKEY = get("WHISPERFLOW_MAC_HOTKEY", "pynput").lower()
