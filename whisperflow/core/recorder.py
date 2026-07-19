@@ -8,7 +8,7 @@ import threading
 import numpy as np
 import sounddevice as sd
 
-SAMPLE_RATE = 16000
+from whisperflow.core.config import SAMPLE_RATE  # centralizado en config (Fase 2)
 
 # Nivel de volumen en vivo (0..1), actualizado por el callback de audio (hilo de
 # PortAudio) y leído por el overlay. Es un float global SIN lock a propósito: es

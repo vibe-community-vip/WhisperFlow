@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Ícono en la bandeja del sistema (núcleo multiplataforma, vía pystray)."""
+"""Ícono en la bandeja del sistema (núcleo multiplataforma, vía pystray).
+
+Se separa ``build_icon`` de ``run_icon`` para que el orquestador pueda actualizar el
+``title`` (tooltip) en vivo durante la carga perezosa del modelo (Fase 2).
+"""
 import pystray
 from PIL import Image, ImageDraw
 
@@ -13,9 +17,13 @@ def make_icon_image():
     return img
 
 
-def run_tray(title: str, on_quit):
-    """Bloqueante. ``on_quit(icon, item)`` es el callback del ítem "Salir"; el
-    orquestador es dueño del apagado (mantiene ``os._exit(0)`` — ver CLAUDE.md)."""
-    icon = pystray.Icon("whisperflow", make_icon_image(), title,
+def build_icon(title: str, on_quit):
+    """on_quit(icon, item) es el callback del ítem "Salir"; el orquestador es dueño
+    del apagado (mantiene ``os._exit(0)`` — ver CLAUDE.md)."""
+    return pystray.Icon("whisperflow", make_icon_image(), title,
                         menu=pystray.Menu(pystray.MenuItem("Salir", on_quit)))
+
+
+def run_icon(icon):
+    """Bloqueante: corre el loop de la bandeja en el hilo principal."""
     icon.run()

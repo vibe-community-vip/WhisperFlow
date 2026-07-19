@@ -4,7 +4,11 @@
 La máquina de estados (cuándo grabar/transcribir/cambiar de perfil) vive aquí. Es
 fiel al monolito original: la lógica de ``_on_event`` / ``_make_profile_key_handler``
 se movió casi verbatim, pero opera sobre atributos de instancia y servicios
-inyectados en vez de sobre globales de módulo. Sin cambio de comportamiento.
+inyectados en vez de sobre globales de módulo.
+
+Fase 2: la configuración viene de ``core.config`` (lee ``.env``), y la carga del
+modelo es perezosa (hilo en background al arrancar). La máquina bloquea el inicio de
+grabación mientras el modelo no esté listo.
 """
 import os
 import sys
@@ -15,18 +19,15 @@ try:
 except Exception:
     pass
 
-from whisperflow.core import asr
-from whisperflow.core.recorder import Recorder, SAMPLE_RATE
+from whisperflow.core import asr, config, rewriter, tray
+from whisperflow.core.recorder import Recorder
+from whisperflow.core.config import SAMPLE_RATE
 from whisperflow.core.dictionary import (
     load_dictionary, build_initial_prompt, apply_aliases, apply_dictionary_corrections,
 )
-from whisperflow.core import rewriter
-from whisperflow.core import tray
 from whisperflow.backends._selector import select_backends
 
 # Teclas de perfil del monolito: "," amigable, "." profesional, "-" normal (None).
-# Se eligieron estas teclas (no letras) porque casi nunca hace falta teclearlas
-# mientras se dicta. "-" cancela el perfil elegido (vuelve a pegar tal cual).
 PROFILE_KEYS = {",": "friendly", ".": "professional", "-": None}
 
 
@@ -35,14 +36,13 @@ class Application:
         self.beep = backends["beep"]()
         self.overlay = backends["overlay"]()
         self.hotkey = backends["hotkey"]()
-        # El pegado necesita inyectar teclas (ctrl+v / cmd+v) vía el backend de hotkeys,
-        # y tocar el beep de "pegado".
         self.paste = backends["paste"](self.hotkey, self.beep)
         self.recorder = Recorder()
+        self.icon = None  # lo crea run() (Fase 2: tooltip "cargando modelo" -> "listo")
 
         # Estado de la máquina de grabación (antes, globales de módulo).
         self._pressed = set()          # ctrl / windows actualmente abajo
-        self._space_held = False       # evita reaccionar a la auto-repetición de Windows
+        self._space_held = False       # evita reaccionar a la auto-repetición del teclado
         self._recording_active = False
         self._hands_free = False
         self._state_lock = threading.Lock()
@@ -53,7 +53,7 @@ class Application:
         self._last_text_lock = threading.Lock()
         self._last_transcribed_text = None
 
-        self.debug = os.environ.get("WHISPERFLOW_DEBUG") == "1"
+        self.debug = config.DEBUG
 
         # Arranca el overlay en su propio hilo con su propio mainloop.
         self.overlay.start()
@@ -76,7 +76,7 @@ class Application:
             return "space"
         return name
 
-    # --- máquina de estados (movida verbatim de _on_event del monolito) ---
+    # --- máquina de estados (movida verbatim de _on_event del monolito + guard de carga) ---
     def on_event(self, event):
         key = self._normalize(event.name)
         if self.debug:
@@ -91,6 +91,11 @@ class Application:
                     self._pressed.add(key)
                     if {"ctrl", "windows"} <= self._pressed:
                         if not self._recording_active:
+                            if not asr.is_loaded():
+                                # El modelo aún carga (arranque): no grabar todavía.
+                                self.overlay.show("loading")
+                                self.beep.no_speech()
+                                return
                             self.recorder.start()
                             self._recording_active = True
                             self._selected_profile = None
@@ -120,11 +125,15 @@ class Application:
             # key == "space"
             if event.event_type == "down":
                 if self._space_held:
-                    return  # auto-repetición de Windows mientras Espacio sigue abajo
+                    return  # auto-repetición mientras Espacio sigue abajo
                 self._space_held = True
                 if not {"ctrl", "windows"} <= self._pressed:
                     return  # Espacio solo no activa nada
                 if not self._recording_active:
+                    if not asr.is_loaded():
+                        self.overlay.show("loading")
+                        self.beep.no_speech()
+                        return
                     self.recorder.start()
                     self._recording_active = True
                     self._selected_profile = None
@@ -218,6 +227,24 @@ class Application:
         self.paste.paste(text)
         print(f"[whisperflow] recuperado: {text}", flush=True)
 
+    def _load_model_in_background(self):
+        # Carga perezosa (Fase 2): arranca la bandeja al instante y carga el modelo en
+        # paralelo. Al terminar, actualiza el tooltip. Si falla, el dictado queda
+        # bloqueado (is_loaded() == False) pero la app sigue para poder salir.
+        try:
+            asr.ensure_loaded()
+        except Exception as e:
+            print(f"[whisperflow] FALLO la carga del modelo: {e}. "
+                  "El dictado no estará disponible hasta resolverlo.", flush=True)
+            return
+        if self.icon is not None:
+            self.icon.title = "WhisperFlow local (Ctrl+Win+Espacio)"
+            try:
+                self.icon.update_menu()  # refresca el tooltip en backends que lo necesiten
+            except Exception:
+                pass
+        print("[whisperflow] modelo listo.", flush=True)
+
     def on_quit(self, icon, item):
         # os._exit(0) es intencional (ver CLAUDE.md): hay hilos daemon (overlay, audio,
         # transcripción) y el mainloop de pystray; un apagado "limpio" colgaría la salida.
@@ -229,9 +256,11 @@ class Application:
 
     def run(self):
         self.setup_hotkeys()
+        self.icon = tray.build_icon("WhisperFlow local (cargando modelo…)", self.on_quit)
+        threading.Thread(target=self._load_model_in_background, daemon=True).start()
         print("[whisperflow] listo. Ctrl+Win = push-to-talk. Ctrl+Win+Espacio = manos libres.",
               flush=True)
-        tray.run_tray("WhisperFlow local (Ctrl+Win+Espacio)", self.on_quit)
+        tray.run_icon(self.icon)
 
 
 def main():
