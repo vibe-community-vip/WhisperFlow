@@ -1,0 +1,42 @@
+# Diccionario personalizado de WhisperFlow local.
+#
+# Hay dos formas de agregar términos:
+#
+# 1) Un término por línea, escrito EXACTAMENTE como quieres que aparezca
+#    (mayúsculas/minúsculas incluidas). Puede ser una frase de varias palabras
+#    (ej. "Wispr Flow"). Whisper lo tendrá en cuenta al transcribir, y si lo
+#    escribe casi bien pero no perfecto, se corrige automáticamente.
+#
+# 2) Si notas que Whisper SIEMPRE transcribe mal un término de la misma forma
+#    (ej. siempre pone "clod" en vez de "Claude"), agrega una línea con "=>":
+#      texto_mal_transcrito => Texto Correcto
+#    Ese reemplazo es exacto (no depende de similitud), así que es la forma
+#    más confiable para corregir errores recurrentes y específicos.
+#
+# Las líneas que empiezan con # se ignoran. Este archivo se relee en cada
+# dictado: agrega o quita términos y pruébalos de inmediato, sin reiniciar.
+#
+# Ejemplos (bórralos o edítalos libremente, son solo punto de partida).
+# Agrega aquí tus propios nombres propios, apodos, herramientas o jerga que
+# uses seguido y que el reconocimiento de voz no acierte bien.
+ChatGPT
+Claude
+Claude Code
+Anthropic
+OpenAI
+Midjourney
+LangChain
+Hugging Face
+faster-whisper
+WhisperX
+Wispr Flow
+n8n
+RAG
+LoRA
+fine-tuning
+prompt engineering
+embeddings
+
+# Ejemplo de alias exacto (edita/borra según lo que realmente te pase):
+clod => Claude
+SAS  => SaaS

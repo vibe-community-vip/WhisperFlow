@@ -1,0 +1,16 @@
+faster-whisper
+keyboard
+sounddevice
+numpy
+pyperclip
+pystray
+pillow
+pywin32
+openai
+winshell
+
+# Aceleración por GPU NVIDIA (opcional). Si no tienes GPU NVIDIA o prefieres no
+# instalarlas, bórralas: whisperflow.py detecta que faltan y usa CPU automáticamente
+# (más lento, pero funciona igual).
+nvidia-cublas-cu12
+nvidia-cudnn-cu12
