@@ -31,6 +31,15 @@ def _load_env_file(path):
                 key, _, val = line.partition("=")
                 key = key.strip()
                 val = val.strip()
+                # Quitar comentarios en línea (" # ...") solo si el valor NO está entre
+                # comillas. Sin esto, "KEY=base  # nota" se lee como "base  # nota".
+                if val and val[0] not in ('"', "'"):
+                    if val.lstrip().startswith("#"):
+                        val = ""
+                    else:
+                        idx = val.find(" #")
+                        if idx != -1:
+                            val = val[:idx].rstrip()
                 if len(val) >= 2 and ((val[0] == val[-1] == '"') or (val[0] == val[-1] == "'")):
                     val = val[1:-1]
                 data[key] = val
@@ -70,7 +79,8 @@ OPENAI_API_KEY = get("OPENAI_API_KEY", "")
 # --- Debug ---
 DEBUG = get_bool("WHISPERFLOW_DEBUG", False)
 
-# --- Mac: backend de hotkeys (Fase 5) ---
-# pynput = estable, sin supresión de tone-keys. cgevent = nativo, SUPRIME tone-keys
-# (experimental, requiere Accesibilidad + Supervisión de entrada).
-MAC_HOTKEY = get("WHISPERFLOW_MAC_HOTKEY", "pynput").lower()
+# --- Mac: backend de hotkeys ---
+# cgevent = nativo vía CGEventTap (DEFAULT): SUPRIME las tone-keys (,/./-) y NO pasa
+#   por HIServices.AXIsProcessTrusted (que crashea con algunos combos pynput+pyobjc).
+# pynput = fallback (no suprime tone-keys; puede crashear según versiones de pyobjc).
+MAC_HOTKEY = get("WHISPERFLOW_MAC_HOTKEY", "cgevent").lower()

@@ -1,25 +1,32 @@
 # -*- coding: utf-8 -*-
-"""Hotkeys globales en macOS vía CGEventTap nativo (pyobjc/Quartz) — Fase 5 (experimental).
+"""Hotkeys globales en macOS vía CGEventTap nativo (pyobjc/Quartz).
 
-A diferencia del backend pynput (Fase 4), CGEventTap **sí permite suprimir teclas**
-(devolviendo None desde el callback se traga el evento). Así las tone-keys
-(,/./-) dejan de escribirse en el campo mientras se graba, igual que en Windows.
+Por qué este backend (y no pynput) es el default en Mac:
+  - **Suprime teclas**: devolviendo ``None`` desde el callback se traga el evento, así
+    las tone-keys ``,``/``.``/``-`` NO se escriben en el campo mientras se graba (igual
+    que en Windows). pynput no suprime de forma fiable en Mac.
+  - **No pasa por ``HIServices.AXIsProcessTrusted``**, que crashea con algunos combos
+    pynput+pyobjc (``KeyError: 'AXIsProcessTrusted'``) dentro del contexto completo de
+    la app. CGEventTap usa Quartz directamente.
 
-AVISO: NO verificado en Mac real (falta pyobjc en el entorno y requiere permisos de
-Accesibilidad Y de "Supervisión de entrada"). Es complejo (run loop, mapeo de
-keycodes, síntesis de eventos); trátalo como experimental y validá paso a paso.
-Seleccionable con ``WHISPERFLOW_MAC_HOTKEY=cgevent`` (default: pynput).
+Requiere **Accesibilidad** y **Supervisión de entrada**. Si el tap no se crea (falta
+permiso), avisa por consola y los atajos no funcionan — pero la app no crashea.
+
+Aordes (Mac): Cmd+Ctrl (push-to-talk), Cmd+Ctrl+Espacio (manos libres),
+Cmd+Shift+Z (re-pegar). Tone-keys: ``,``/``.``/``-`` (suprimidas al escribir).
 """
 import threading
 
 from whisperflow.core.hotkey_base import HotkeyBackend, HotkeyCapabilities
 
-# Keycodes (layout US) de las teclas que nos interesan.
+# Keycodes (layout US). Suficiente para los modificadores, espacio, tone-keys y z.
 _KC = {
     0x37: "cmd", 0x36: "cmd",        # left/right command
     0x3B: "ctrl", 0x3E: "ctrl",      # left/right control
     0x3A: "alt", 0x3D: "alt",        # left/right option
     0x31: "space",
+    0x2B: ",", 0x2F: ".", 0x1B: "-",  # tone-keys
+    0x06: "z",
 }
 
 
@@ -32,47 +39,53 @@ class _Event:
 
 
 class CGEventTapHotkeyBackend(HotkeyBackend):
-    """Captura global vía CGEventTap. Puede suprimir (suppress_supported=True)."""
-
     def __init__(self):
         self._on_event = None
-        self._suppressible = {}   # nombre(tecla) -> handler
+        self._suppressible = {}   # nombre(tecla) -> handler (tone-keys)
+        self._repaste_cb = None   # callback de re-paste (Cmd+Shift+Z)
         self._tap = None
         self._source = None
         self._thread = None
         self._runloop = None
 
-    # --- mapeo keycode -> nombre ---
-    @staticmethod
-    def _name_for(event, keycode):
-        if keycode in _KC:
-            return _KC[keycode]
-        # Letras/signos: pedir el unicode al evento.
-        try:
-            import Quartz
-            n = Quartz.CGEventKeyboardGetUnicodeString(event, 4, None, None)
-            # Algunas versiones de pyobjc devuelven (string, len); normalizamos:
-            if isinstance(n, tuple):
-                n = n[0]
-            if n:
-                return n[:1].lower()
-        except Exception:
-            pass
-        return ""
-
     def start(self, on_event):
         self._on_event = on_event
+        import Quartz
+        from CoreFoundation import (CFMachPortCreateRunLoopSource, CFRunLoopAddSource,
+                                    CFRunLoopGetCurrent, CFRunLoopRun, kCFRunLoopCommonModes)
+
+        _FLAG_FOR = {"cmd": Quartz.kCGEventFlagMaskCommand,
+                     "ctrl": Quartz.kCGEventFlagMaskControl,
+                     "alt": Quartz.kCGEventFlagMaskAlternate,
+                     "shift": Quartz.kCGEventFlagMaskShift}
+        _FLAGS_CHANGED = Quartz.kCGEventFlagsChanged
 
         def tap_callback(proxy, event_type, event, refcon):
             try:
-                import Quartz
                 keycode = Quartz.CGEventGetIntegerValueField(event, Quartz.kCGKeyboardEventKeycode)
-                name = self._name_for(event, keycode)
-                is_down = event_type == Quartz.kCGEventKeyDown
-                etype = "down" if is_down else "up"
+                name = _KC.get(keycode, "")
 
-                # Tone-keys: despachar al handler y SUPRIMIR si este devuelve False
-                # (es decir, mientras se graba). Fuera de grabación, pasa la tecla.
+                # Los modificadores en macOS llegan como FlagsChanged (no KeyDown/Up):
+                # deducimos down/up mirando si su flag quedó prendido.
+                if event_type == _FLAGS_CHANGED and name in _FLAG_FOR:
+                    is_down = bool(Quartz.CGEventGetFlags(event) & _FLAG_FOR[name])
+                    etype = "down" if is_down else "up"
+                else:
+                    is_down = event_type == Quartz.kCGEventKeyDown
+                    etype = "down" if is_down else "up"
+
+                # Re-paste: Cmd+Shift+Z (detectado por flags al presionar z).
+                if name == "z" and is_down and self._repaste_cb is not None:
+                    flags = Quartz.CGEventGetFlags(event)
+                    if (flags & Quartz.kCGEventFlagMaskCommand) and (flags & Quartz.kCGEventFlagMaskShift):
+                        try:
+                            self._repaste_cb()
+                        except Exception:
+                            pass
+                        return None  # tragamos la z
+
+                # Tone-keys: despachar al handler y SUPRIMIR si devuelve False
+                # (devuelve False mientras se graba -> la tecla no se escribe).
                 if name in self._suppressible:
                     try:
                         swallow = self._suppressible[name](_Event(name, etype))
@@ -80,7 +93,7 @@ class CGEventTapHotkeyBackend(HotkeyBackend):
                         swallow = True
                     return None if not swallow else event
 
-                # Modificadores / espacio / resto: alimentan la máquina de estados.
+                # Modificadores / espacio: alimentan la máquina de estados.
                 if name in ("ctrl", "cmd", "alt", "space"):
                     try:
                         on_event(_Event(name, etype))
@@ -88,27 +101,24 @@ class CGEventTapHotkeyBackend(HotkeyBackend):
                         pass
                 return event
             except Exception:
-                return event  # ante cualquier duda, dejar pasar
+                return event  # ante duda, dejar pasar el evento
 
-        import Quartz
-        from CoreFoundation import (CFRunLoopGetCurrent, CFRunLoopAddSource,
-                                    kCFRunLoopCommonModes, CFRunLoopRun, CFRunLoopStop)
-
-        # kCGEventTapOptionDefault permite suprimir (devolviendo None). Head tap = alta prioridad.
         self._tap = Quartz.CGEventTapCreate(
             Quartz.kCGSessionEventTap,
-            Quartz.kCGHeadTapEventTap,
-            Quartz.kCGEventTapOptionDefault,
-            Quartz.CGEventMaskBit(Quartz.kCGEventKeyDown) | Quartz.CGEventMaskBit(Quartz.kCGEventKeyUp),
+            0,   # placement = kCGHeadTapEventTap (pyobjc no expone el nombre; uso su valor)
+            Quartz.kCGEventTapOptionDefault,   # permite suprimir (devolviendo None)
+            (Quartz.CGEventMaskBit(Quartz.kCGEventKeyDown)
+             | Quartz.CGEventMaskBit(Quartz.kCGEventKeyUp)
+             | Quartz.CGEventMaskBit(Quartz.kCGEventFlagsChanged)),  # modificadores
             tap_callback,
             None,
         )
         if self._tap is None:
-            print("[whisperflow] CGEventTap NO se pudo crear (¿falta permiso de Accesibilidad "
-                  "y/o Supervisión de entrada?). El backend cgevent no funcionará.", flush=True)
+            print("[whisperflow] CGEventTap NO se pudo crear (¿falta Accesibilidad / "
+                  "Supervisión de entrada?). Los atajos no funcionarán.", flush=True)
             return
 
-        self._source = Quartz.CFMachPortCreateRunLoopSource(None, self._tap, 0)
+        self._source = CFMachPortCreateRunLoopSource(None, self._tap, 0)
 
         def _run():
             self._runloop = CFRunLoopGetCurrent()
@@ -123,51 +133,23 @@ class CGEventTapHotkeyBackend(HotkeyBackend):
         self._suppressible[key] = handler
 
     def register_hotkey(self, combo, callback):
-        # Con CGEventTap podríamos detectar el acorde de re-paste aquí mismo, pero para
-        # mantenerlo simple delegamos al registro normal (Command ya se trackea). En la
-        # práctica, el re-paste se maneja como cualquier otra secuencia observada.
-        # (Por ahora no se registra un globalhotkeys aparte: verificación pendiente.)
-        pass
+        # combo llega en sintaxis de la lib keyboard (ej. "ctrl+alt+z"). En Mac lo
+        # manejamos dentro del tap como Cmd+Shift+Z; guardamos el callback.
+        self._repaste_cb = callback
 
     def send(self, combo):
-        # Síntesis vía CGEvent (igual que macos/paste.py para cmd+v).
-        try:
-            import Quartz
-            # Soporta "cmd+v"; se puede extender. El pegado real lo hace paste.py.
-            mapping = {"v": 0x09, "z": 0x06, "cmd": 0x37, "ctrl": 0x3B}
-            parts = combo.split("+")
-            key = parts[-1]
-            mods = parts[:-1]
-            src = Quartz.CGEventSourceCreate(Quartz.kCGEventSourceStateHIDSystemState)
-            for m in mods:
-                md = Quartz.CGEventCreateKeyboardEvent(src, mapping.get(m, 0), True)
-                Quartz.CGEventPost(Quartz.kCGHIDEventTap, md)
-            kd = Quartz.CGEventCreateKeyboardEvent(src, mapping.get(key, 0), True)
-            ku = Quartz.CGEventCreateKeyboardEvent(src, mapping.get(key, 0), False)
-            flag = 0
-            if "cmd" in mods: flag |= Quartz.kCGEventFlagMaskCommand
-            if "ctrl" in mods: flag |= Quartz.kCGEventFlagMaskControl
-            Quartz.CGEventSetFlags(kd, flag)
-            Quartz.CGEventSetFlags(ku, flag)
-            Quartz.CGEventPost(Quartz.kCGHIDEventTap, kd)
-            Quartz.CGEventPost(Quartz.kCGHIDEventTap, ku)
-            for m in reversed(mods):
-                mu = Quartz.CGEventCreateKeyboardEvent(src, mapping.get(m, 0), False)
-                Quartz.CGEventPost(Quartz.kCGHIDEventTap, mu)
-        except Exception:
-            pass
+        _send_combo(combo)
 
     def release(self, key):
-        pass  # CGEventTap no mantiene estado de teclas "mantenidas" como pynput
+        pass  # CGEventTap no mantiene estado de teclas "mantenidas"
 
     def stop(self):
         try:
-            import Quartz
-            from CoreFoundation import CFRunLoopStop
+            from CoreFoundation import CFRunLoopStop, CFMachPortInvalidate
             if self._runloop is not None:
                 CFRunLoopStop(self._runloop)
             if self._tap is not None:
-                Quartz.CFMachPortInvalidate(self._tap)
+                CFMachPortInvalidate(self._tap)
         except Exception:
             pass
 
@@ -175,3 +157,36 @@ class CGEventTapHotkeyBackend(HotkeyBackend):
         return HotkeyCapabilities(suppress_supported=True,
                                   send_supported=True,
                                   observe_all_keys=True)
+
+
+def _send_combo(combo):
+    """Síntesis mínima vía CGEvent (soporta 'cmd+v', 'ctrl+v'). El pegado real lo hace
+    ``paste.py`` (que también usa CGEvent), así que esto casi no se usa."""
+    try:
+        import Quartz
+        mods_map = {"cmd": (0x37, Quartz.kCGEventFlagMaskCommand),
+                    "ctrl": (0x3B, Quartz.kCGEventFlagMaskControl),
+                    "shift": (0x38, Quartz.kCGEventFlagMaskShift),
+                    "alt": (0x3A, Quartz.kCGEventFlagMaskAlternate)}
+        key_kc = {"v": 0x09, "z": 0x06, "c": 0x08}
+        parts = [p.strip() for p in combo.split("+")]
+        key = parts[-1]
+        mods = [p for p in parts[:-1] if p in mods_map]
+        src = Quartz.CGEventSourceCreate(Quartz.kCGEventSourceStateHIDSystemState)
+        flag = 0
+        for m in mods:
+            flag |= mods_map[m][1]
+        for m in mods:
+            Quartz.CGEventPost(Quartz.kCGHIDEventTap,
+                               Quartz.CGEventCreateKeyboardEvent(src, mods_map[m][0], True))
+        kd = Quartz.CGEventCreateKeyboardEvent(src, key_kc.get(key, 0), True)
+        ku = Quartz.CGEventCreateKeyboardEvent(src, key_kc.get(key, 0), False)
+        Quartz.CGEventSetFlags(kd, flag)
+        Quartz.CGEventSetFlags(ku, flag)
+        Quartz.CGEventPost(Quartz.kCGHIDEventTap, kd)
+        Quartz.CGEventPost(Quartz.kCGHIDEventTap, ku)
+        for m in reversed(mods):
+            Quartz.CGEventPost(Quartz.kCGHIDEventTap,
+                               Quartz.CGEventCreateKeyboardEvent(src, mods_map[m][0], False))
+    except Exception:
+        pass
