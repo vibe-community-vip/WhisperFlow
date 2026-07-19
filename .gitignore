@@ -1,7 +1,11 @@
-# Entorno virtual (creado por setup.ps1)
+# Entorno virtual (creado por setup.ps1 / install.sh)
 venv/
 .venv/
+venv-*/
 env/
+
+# Secretos locales (NUNCA commitear .env — contiene la API key)
+.env
 
 # Bytecode de Python
 __pycache__/
