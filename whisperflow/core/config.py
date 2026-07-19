@@ -121,4 +121,4 @@ PROFILE_KEYS = _parse_profile_keys(get("WHISPERFLOW_PROFILE_KEYS", ",:friendly|.
 ASR_ENGINE = get("WHISPERFLOW_ASR_ENGINE", "").strip().lower()
 if ASR_ENGINE not in ("mlx", "faster_whisper"):
     ASR_ENGINE = "mlx" if (sys.platform == "darwin" and platform.machine() == "arm64") else "faster_whisper"
-MLX_MODEL = get("WHISPERFLOW_MLX_MODEL", "mlx-community/whisper-large-v3-mlx-q4")
+MLX_MODEL = get("WHISPERFLOW_MLX_MODEL", "mlx-community/whisper-large-v3-mlx-4bit")
