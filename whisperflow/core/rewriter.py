@@ -1,13 +1,26 @@
 # -*- coding: utf-8 -*-
-"""Reescritura de tono vía LLM (núcleo multiplataforma).
+"""Reescritura de tono vía LLM (núcleo multiplataforma) — Fase 3: selector de backend.
 
-Fase 1: solo OpenAI, idéntico al monolito original (degradación elegante: si no
-hay ``OPENAI_API_KEY``, se pega el texto tal cual y se avisa una vez por consola).
-Fase 3 agrega Ollama (local) + un selector con auto-detección.
+Tres backends, todos con la misma interfaz ``rewrite(text, profile)``:
+  - OllamaRewriter: LLM LOCAL (recomendado, offline). Reutiliza el cliente OpenAI
+    contra el endpoint compatible ``http://localhost:11434/v1`` (api_key indiferente).
+  - OpenAIRewriter: OpenAI cloud (requiere ``OPENAI_API_KEY``).
+  - NoopRewriter: no reescribe (devuelve el texto tal cual).
+
+``select_rewriter()`` elige según ``WHISPERFLOW_LLM_BACKEND`` (``auto|ollama|openai|none``):
+  - ``auto``: Ollama si responde (~200ms), si no OpenAI si hay key, si no Noop con
+    aviso único. Es el default.
+Cada ``rewrite`` tiene timeout (Ollama en frío puede tardar); si falla, se devuelve
+el texto original y se avisa por consola (degradación elegante, igual que el monolito).
 """
-import os
+import socket
+import urllib.parse
 
-OPENAI_MODEL = "gpt-4.1-nano"  # el más rápido/barato de OpenAI apto para reescribir texto corto
+from whisperflow.core import config
+
+# Tiempo máx de una reescritura. Ollama puede tardar la primera vez (carga del modelo
+# en RAM); si excede, devolvemos el texto original en lugar de colgar el pegado.
+REWRITE_TIMEOUT = 30.0
 
 PROFILE_PROMPTS = {
     "friendly": (
@@ -31,46 +44,168 @@ PROFILE_PROMPTS = {
     ),
 }
 
-_openai_client = None
-_openai_warned = False
 
+class Rewriter:
+    """Interfaz base. Cada subclase implementa ``rewrite``."""
+    name = "none"
 
-def _get_openai_client():
-    global _openai_client, _openai_warned
-    if _openai_client is not None:
-        return _openai_client
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        if not _openai_warned:
-            print("[whisperflow] OPENAI_API_KEY no configurada; los perfiles de tono se "
-                  "ignorarán y se pegará el texto normal", flush=True)
-            _openai_warned = True
-        return None
-    try:
-        from openai import OpenAI
-        _openai_client = OpenAI(api_key=api_key)
-        return _openai_client
-    except Exception as e:
-        print(f"[whisperflow] no se pudo iniciar cliente OpenAI: {e}", flush=True)
-        return None
+    def is_available(self) -> bool:
+        return True
 
-
-def rewrite_with_llm(text, profile):
-    system_prompt = PROFILE_PROMPTS.get(profile)
-    if not system_prompt:
+    def rewrite(self, text: str, profile: str) -> str:
         return text
-    client = _get_openai_client()
-    if client is None:
-        return text
-    try:
-        resp = client.chat.completions.create(
-            model=OPENAI_MODEL,
-            messages=[{"role": "system", "content": system_prompt},
-                      {"role": "user", "content": text}],
-            temperature=0.4,
-        )
-        rewritten = (resp.choices[0].message.content or "").strip()
-        return rewritten or text
-    except Exception as e:
-        print(f"[whisperflow] error al reescribir con LLM ({profile}): {e}", flush=True)
-        return text
+
+
+class NoopRewriter(Rewriter):
+    name = "none"
+
+
+class OpenAIRewriter(Rewriter):
+    name = "openai"
+
+    def __init__(self):
+        self._client = None
+        self._warned = False
+
+    def is_available(self):
+        return bool(config.OPENAI_API_KEY)
+
+    def _get_client(self):
+        if self._client is not None:
+            return self._client
+        if not config.OPENAI_API_KEY:
+            if not self._warned:
+                print("[whisperflow] OPENAI_API_KEY no configurada; los perfiles de tono se "
+                      "ignoran y se pegará el texto normal", flush=True)
+                self._warned = True
+            return None
+        try:
+            from openai import OpenAI
+            self._client = OpenAI(api_key=config.OPENAI_API_KEY)
+            return self._client
+        except Exception as e:
+            print(f"[whisperflow] no se pudo iniciar cliente OpenAI: {e}", flush=True)
+            return None
+
+    def rewrite(self, text, profile):
+        system_prompt = PROFILE_PROMPTS.get(profile)
+        if not system_prompt:
+            return text
+        client = self._get_client()
+        if client is None:
+            return text
+        try:
+            resp = client.chat.completions.create(
+                model=config.OPENAI_MODEL,
+                messages=[{"role": "system", "content": system_prompt},
+                          {"role": "user", "content": text}],
+                temperature=0.4,
+                timeout=REWRITE_TIMEOUT,
+            )
+            rewritten = (resp.choices[0].message.content or "").strip()
+            return rewritten or text
+        except Exception as e:
+            print(f"[whisperflow] error al reescribir con OpenAI ({profile}): {e}", flush=True)
+            return text
+
+
+class OllamaRewriter(Rewriter):
+    name = "ollama"
+
+    def __init__(self):
+        self._client = None
+        self._probe = None  # cache de la sonda de disponibilidad
+
+    def is_available(self):
+        """Sonda TCP corta (~200ms) al host:puerto del OLLAMA_BASE_URL."""
+        if self._probe is not None:
+            return self._probe
+        try:
+            u = urllib.parse.urlparse(config.OLLAMA_BASE_URL)
+            host = u.hostname or "localhost"
+            port = u.port or 11434
+            with socket.create_connection((host, port), timeout=0.2):
+                pass
+            self._probe = True
+        except Exception:
+            self._probe = False
+        return self._probe
+
+    def _get_client(self):
+        if self._client is not None:
+            return self._client
+        try:
+            from openai import OpenAI
+            # api_key indiferente: Ollama no la valida; lo pide la firma del cliente.
+            # base_url apunta al endpoint compatible /v1 de Ollama.
+            self._client = OpenAI(base_url=config.OLLAMA_BASE_URL, api_key="ollama")
+            return self._client
+        except Exception as e:
+            print(f"[whisperflow] no se pudo iniciar cliente Ollama: {e}", flush=True)
+            return None
+
+    def rewrite(self, text, profile):
+        system_prompt = PROFILE_PROMPTS.get(profile)
+        if not system_prompt:
+            return text
+        client = self._get_client()
+        if client is None:
+            return text
+        try:
+            resp = client.chat.completions.create(
+                model=config.OLLAMA_MODEL,
+                messages=[{"role": "system", "content": system_prompt},
+                          {"role": "user", "content": text}],
+                temperature=0.4,
+                timeout=REWRITE_TIMEOUT,
+            )
+            rewritten = (resp.choices[0].message.content or "").strip()
+            return rewritten or text
+        except Exception as e:
+            print(f"[whisperflow] error al reescribir con Ollama ({profile}): {e}", flush=True)
+            return text
+
+
+_rewriter = None
+_warned_auto = False
+
+
+def select_rewriter() -> Rewriter:
+    """Elige y cachea el rewriter según WHISPERFLOW_LLM_BACKEND. Idempotente."""
+    global _rewriter, _warned_auto
+    if _rewriter is not None:
+        return _rewriter
+
+    backend = config.LLM_BACKEND
+    if backend == "none":
+        _rewriter = NoopRewriter()
+    elif backend == "openai":
+        _rewriter = OpenAIRewriter()
+    elif backend == "ollama":
+        _rewriter = OllamaRewriter()
+    else:  # "auto" (default)
+        ollama = OllamaRewriter()
+        if ollama.is_available():
+            _rewriter = ollama
+        else:
+            openai = OpenAIRewriter()
+            if openai.is_available():
+                _rewriter = openai
+            else:
+                if not _warned_auto:
+                    print("[whisperflow] sin backend de tono disponible: Ollama no responde y no "
+                          "hay OPENAI_API_KEY. Los perfiles de tono se ignorarán.", flush=True)
+                    _warned_auto = True
+                _rewriter = NoopRewriter()
+
+    print(f"[whisperflow] backend de tono activo: {_rewriter.name}", flush=True)
+    return _rewriter
+
+
+def get_rewriter() -> Rewriter:
+    return select_rewriter()
+
+
+def rewrite_with_llm(text: str, profile: str) -> str:
+    """Compatibilidad: delega al rewriter seleccionado. app.py usa esta función."""
+    return select_rewriter().rewrite(text, profile)

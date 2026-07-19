@@ -229,16 +229,21 @@ class Application:
 
     def _load_model_in_background(self):
         # Carga perezosa (Fase 2): arranca la bandeja al instante y carga el modelo en
-        # paralelo. Al terminar, actualiza el tooltip. Si falla, el dictado queda
-        # bloqueado (is_loaded() == False) pero la app sigue para poder salir.
+        # paralelo. Al terminar, actualiza el tooltip (incluye el backend de tono activo,
+        # Fase 3). Si falla, el dictado queda bloqueado (is_loaded() == False) pero la app
+        # sigue para poder salir.
         try:
             asr.ensure_loaded()
         except Exception as e:
             print(f"[whisperflow] FALLO la carga del modelo: {e}. "
                   "El dictado no estará disponible hasta resolverlo.", flush=True)
             return
+        try:
+            llm_name = rewriter.get_rewriter().name  # Fase 3: sondea/selecciona el backend
+        except Exception:
+            llm_name = "?"
         if self.icon is not None:
-            self.icon.title = "WhisperFlow local (Ctrl+Win+Espacio)"
+            self.icon.title = f"WhisperFlow local (Ctrl+Win+Espacio) · LLM: {llm_name}"
             try:
                 self.icon.update_menu()  # refresca el tooltip en backends que lo necesiten
             except Exception:
