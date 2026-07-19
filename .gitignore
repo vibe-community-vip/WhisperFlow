@@ -1,0 +1,23 @@
+# Entorno virtual (creado por setup.ps1)
+venv/
+.venv/
+env/
+
+# Bytecode de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Logs de depuración (ver CLAUDE.md > "Cómo probar cambios")
+debug.log
+debug_err.log
+
+# Cachés locales que puedan generarse dentro de la carpeta
+.cache/
+*.egg-info/
+
+# Basura del sistema / editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
