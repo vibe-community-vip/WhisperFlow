@@ -7,6 +7,9 @@ env/
 # Secretos locales (NUNCA commitear .env — contiene la API key)
 .env
 
+# Historial de transcripciones (generado por la app)
+transcripciones.md
+
 # Bytecode de Python
 __pycache__/
 *.py[cod]

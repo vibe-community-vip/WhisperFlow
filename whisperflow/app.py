@@ -19,7 +19,7 @@ try:
 except Exception:
     pass
 
-from whisperflow.core import asr, config, rewriter, tray
+from whisperflow.core import asr, config, history, rewriter, tray
 from whisperflow.core.recorder import Recorder
 from whisperflow.core.config import SAMPLE_RATE
 from whisperflow.core.dictionary import (
@@ -211,6 +211,7 @@ class Application:
 
             with self._last_text_lock:
                 self._last_transcribed_text = text
+            history.append(text, profile)  # historial markdown (1 entrada por transcripción)
             self.paste.paste(text)
             print(f"[whisperflow] pegado: {text}", flush=True)
         finally:
