@@ -12,6 +12,8 @@ acá, con los MISMOS valores por defecto -> sin cambio de comportamiento si no h
 a leer de aquí.)
 """
 import os
+import sys
+import platform
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _PKG = os.path.dirname(_HERE)
@@ -84,3 +86,39 @@ DEBUG = get_bool("WHISPERFLOW_DEBUG", False)
 #   por HIServices.AXIsProcessTrusted (que crashea con algunos combos pynput+pyobjc).
 # pynput = fallback (no suprime tone-keys; puede crashear según versiones de pyobjc).
 MAC_HOTKEY = get("WHISPERFLOW_MAC_HOTKEY", "cgevent").lower()
+
+# --- Atajos configurables (nombres canónicos: super, ctrl, alt, shift, space, o un char) ---
+# super = Win (Win/Linux) o Cmd (Mac). Así una sola config sirve en todos los SO.
+def _csv(s):
+    return [x.strip() for x in (s or "").split(",") if x.strip()]
+
+PTT_KEYS = set(_csv(get("WHISPERFLOW_PTT_KEYS", "super,ctrl")))        # modificadores para push-to-talk
+HANDSFREE_KEY = get("WHISPERFLOW_HANDSFREE_KEY", "space").strip()      # asciende a manos libres (con PTT sostenido)
+REPASTE_KEYS = _csv(get("WHISPERFLOW_REPASTE_KEYS", "ctrl,alt,z"))     # acorde para re-pegar último texto
+
+
+def _parse_profile_keys(s):
+    # Formato "k1:perfil|k2:perfil|k3:" separado por '|'. Perfil vacío = normal (None).
+    d = {}
+    for item in (s or "").split("|"):
+        item = item.strip()
+        if not item:
+            continue
+        if ":" in item:
+            k, v = item.split(":", 1)
+            d[k.strip()] = (v.strip() or None)
+        else:
+            d[item] = None
+    return d
+
+
+PROFILE_KEYS = _parse_profile_keys(get("WHISPERFLOW_PROFILE_KEYS", ",:friendly|.:professional|-:"))
+
+# --- Motor ASR ---
+# faster-whisper (ctranslate2) NO soporta Metal: en Apple Silicon es CPU-only.
+# mlx-whisper usa la GPU unificada (Metal) => mucho más rápido en M-series.
+#   "" (auto) = mlx en Mac arm64, faster_whisper en el resto.
+ASR_ENGINE = get("WHISPERFLOW_ASR_ENGINE", "").strip().lower()
+if ASR_ENGINE not in ("mlx", "faster_whisper"):
+    ASR_ENGINE = "mlx" if (sys.platform == "darwin" and platform.machine() == "arm64") else "faster_whisper"
+MLX_MODEL = get("WHISPERFLOW_MLX_MODEL", "mlx-community/whisper-large-v3-mlx-q4")

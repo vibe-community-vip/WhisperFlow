@@ -78,19 +78,17 @@ class MacOSHotkeyBackend(HotkeyBackend):
         # on_press. NO hay supresión real en Mac v1 (la tecla se escribe igual).
         self._suppressible[key] = handler
 
-    def register_hotkey(self, combo, callback):
-        # combo llega en sintaxis de la lib keyboard (ej. "ctrl+alt+z"). En Mac lo
-        # traducimos a un acorde friendly con pynput GlobalHotKeys: Cmd+Shift+Z.
-        # (Solo se registra el re-pegar de último texto.)
+    def register_hotkey(self, keys, callback):
+        # keys canónicos -> sintaxis pynput GlobalHotKeys (super => <cmd>, etc.).
+        mp = {"super": "<cmd>", "ctrl": "<ctrl>", "alt": "<alt>", "shift": "<shift>"}
+        parts = [mp.get(k, f"<{k}>") for k in keys]
+        spec = "+".join(parts)
         try:
-            self._global_hotkeys = pk.GlobalHotKeys({
-                "<cmd>+<shift>+z": callback,
-            })
+            self._global_hotkeys = pk.GlobalHotKeys({spec: callback})
             self._global_hotkeys.daemon = True
             self._global_hotkeys.start()
         except Exception as e:
-            print(f"[whisperflow] no se pudo registrar el atajo de re-paste en Mac: {e}",
-                  flush=True)
+            print(f"[whisperflow] no se pudo registrar re-paste (Mac/pynput): {e}", flush=True)
 
     def send(self, combo):
         # Síntesis básica vía pynput Controller (puede requerir Accesibilidad).

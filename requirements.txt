@@ -20,6 +20,9 @@ pynput ; sys_platform == "darwin"
 pyobjc-core ; sys_platform == "darwin"
 pyobjc-framework-Cocoa ; sys_platform == "darwin"
 pyobjc-framework-Quartz ; sys_platform == "darwin"
+pyobjc-framework-ApplicationServices ; sys_platform == "darwin"
+# mlx-whisper: transcripción en la GPU (Metal) de Apple Silicon. Solo arm64.
+mlx-whisper ; sys_platform == "darwin" and platform_machine == "arm64"
 
 # Aceleración por GPU NVIDIA (opcional). En Mac no aplica (Apple Silicon => CPU).
 # Sin GPU NVIDIA o si prefieres no instalarlas, bórralas: faster-whisper cae a CPU.

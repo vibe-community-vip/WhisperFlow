@@ -14,7 +14,9 @@ class WindowsHotkeyBackend(HotkeyBackend):
         # El handler devuelve True = dejar pasar, False = tragarla (ver CLAUDE.md).
         keyboard.hook_key(key, handler, suppress=True)
 
-    def register_hotkey(self, combo, callback):
+    def register_hotkey(self, keys, callback):
+        # keys canónicos -> sintaxis de la lib keyboard (super => "windows").
+        combo = "+".join({"super": "windows"}.get(k, k) for k in keys)
         keyboard.add_hotkey(combo, callback)
 
     def send(self, combo):
