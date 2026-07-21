@@ -8,6 +8,12 @@ Este proyecto es **código fuente editable a propósito**, no un instalador cerr
 Está pensado para que lo sigas ajustando — a mano, o pidiéndole los cambios a un
 agente de código como Claude Code (ver más abajo).
 
+## Comunidad
+
+Creado por la comunidad **[Vibe Community VIP](https://www.skool.com/vibe-community-vip)**.
+Allí conseguís más información, guías, soporte y novedades sobre este y otros
+proyectos.
+
 ## Atajos
 
 - **Push-to-talk** — habla mientras sostienes las teclas; al soltar, transcribe y pega.
