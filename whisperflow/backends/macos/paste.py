@@ -3,10 +3,36 @@
 
 Usa Quartz directamente (no pynput) porque la síntesis fiable de teclas para pegar
 en OTRA app en Mac pasa por CGEventPost, que requiere permiso de Accesibilidad.
+
+**Restaura el portapapeles previo** (igual que el backend de Windows): antes de
+pegar lo guardamos con ``pbpaste`` y, tras un ``Cmd+V`` + pausa de 0.6 s, lo
+devolvemos con ``pbcopy`` en un hilo daemon. Así dictar no te pisa el portapapeles.
+Limitación (compartida con Windows/pyperclip): si tenías algo **no-textual** copiado
+(una imagen), ``pbpaste`` no lo emite a stdout => al restaurar el portapapeles queda
+vacío. Para dictado de texto (el caso de uso) es correcto.
 """
 import subprocess
+import threading
+import time
 
 from whisperflow.core.paste_base import PasteBackend
+
+
+def _save_clipboard():
+    """Devuelve el contenido actual del portapapeles (bytes) o None si falla."""
+    try:
+        return subprocess.run(["pbpaste"], capture_output=True).stdout
+    except Exception:
+        return None
+
+
+def _restore_clipboard(data: bytes):
+    """Vuelve a poner ``data`` (bytes) en el portapapeles vía pbcopy."""
+    try:
+        p = subprocess.Popen(["pbcopy"], stdin=subprocess.PIPE)
+        p.communicate(input=data)
+    except Exception:
+        pass
 
 
 def _post_cmd_v():
@@ -31,17 +57,30 @@ class MacOSPasteBackend(PasteBackend):
         self._beep = beep
 
     def paste(self, text: str):
-        # Portapapeles vía pbcopy (propio de macOS; no depende de pyperclip).
+        # 1) Guardar el portapapeles previo para restaurarlo después.
+        prev = _save_clipboard()
+
+        # 2) Portapapeles vía pbcopy (propio de macOS; no depende de pyperclip).
         # Espacio final intencional ("text + " ") para separar del cursor.
         try:
             subprocess.run(["pbcopy"], input=(text + " ").encode("utf-8"), check=False)
         except Exception as e:
             print(f"[whisperflow] pbcopy falló: {e}", flush=True)
 
+        # 3) Inyectar Cmd+V en la app con foco.
         try:
             _post_cmd_v()
         except Exception as e:
             print(f"[whisperflow] paste CGEvent falló (¿falta permiso de Accesibilidad?): {e}",
                   flush=True)
 
+        # 4) Restaurar el portapapeles previo tras una pausa (hilo daemon, no bloquea).
+        if prev is not None:
+            threading.Thread(target=self._restore_after, args=(0.6, prev), daemon=True).start()
+
         self._beep.pasted()
+
+    @staticmethod
+    def _restore_after(delay, data):
+        time.sleep(delay)
+        _restore_clipboard(data)

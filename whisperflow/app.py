@@ -16,7 +16,7 @@ try:
 except Exception:
     pass
 
-from whisperflow.core import asr, config, history, rewriter, tray
+from whisperflow.core import asr, config, history, rewriter, tray, vad
 from whisperflow.core.recorder import Recorder
 from whisperflow.core.config import SAMPLE_RATE
 from whisperflow.core.dictionary import (
@@ -186,6 +186,15 @@ class Application:
             duration = len(audio) / SAMPLE_RATE
             if duration < 0.25:
                 print("[whisperflow] grabación demasiado corta, se ignora", flush=True)
+                self.beep.no_speech()
+                return
+            # VAD por energía: descarta capturas mudas ANTES de transcribir, para
+            # evitar que Whisper alucine texto repetido sobre silencio.
+            v = vad.evaluate(audio)
+            if not v["speech"]:
+                print(f"[whisperflow] no se detectó voz (VAD: peak={v['peak']:.4f} "
+                      f"umbral={v['threshold']:.4f} tramas_activas={v['active']}/{v['n_frames']})",
+                      flush=True)
                 self.beep.no_speech()
                 return
             terms, aliases = load_dictionary()

@@ -122,3 +122,14 @@ ASR_ENGINE = get("WHISPERFLOW_ASR_ENGINE", "").strip().lower()
 if ASR_ENGINE not in ("mlx", "faster_whisper"):
     ASR_ENGINE = "mlx" if (sys.platform == "darwin" and platform.machine() == "arm64") else "faster_whisper"
 MLX_MODEL = get("WHISPERFLOW_MLX_MODEL", "mlx-community/whisper-large-v3-mlx-4bit")
+
+# --- VAD (descarta capturas mudas ANTES de transcribir) ---
+# Whisper alucina texto repetido sobre audio casi mudo; este filtro por energía lo
+# evita. Medido en la Mac de referencia: silencio ~RMS 0.003, dictado real ~0.1-0.2.
+# VAD_THRESHOLD queda ~3× sobre el silencio y ~12× bajo el habla => no rompe dictado.
+# Si alguna vez te rechaza dictado real (poco probable), bajá el umbral o poned
+# WHISPERFLOW_VAD=0 para desactivarlo.
+VAD_ENABLED = get_bool("WHISPERFLOW_VAD", True)
+VAD_THRESHOLD = float(get("WHISPERFLOW_VAD_THRESHOLD", "0.008"))   # RMS por trama (float32, 0..1)
+VAD_MIN_FRAMES = int(get("WHISPERFLOW_VAD_MIN_FRAMES", "3"))        # tramas mínimas sobre el umbral
+VAD_FRAME_MS = int(get("WHISPERFLOW_VAD_FRAME_MS", "30"))           # tamaño de trama de análisis

@@ -67,9 +67,13 @@ Forzable con `WHISPERFLOW_LLM_BACKEND`. Cada reescritura tiene timeout de 30 s y
 ### Atajos por SO
 - **Windows / Linux (X11)**: `Ctrl+Win`/`Ctrl+Super` push-to-talk; `+Espacio` manos
   libres; `Ctrl+Alt+Z` re-pegar; `,`/`.`/`-` eligen perfil (y se **suprimen** al escribir).
-- **macOS (v1)**: `Cmd+Ctrl` PTT; `Cmd+Ctrl+Espacio` manos libres; `Cmd+Shift+Z`
-  re-pegar; `,`/`.`/`-` eligen perfil pero **no se suprimen** (se escriben; bórralas).
-  Para supresión nativa: `WHISPERFLOW_MAC_HOTKEY=cgevent` (CGEventTap, experimental).
+- **macOS**: `Cmd+Ctrl` PTT; `Cmd+Ctrl+Espacio` manos libres; `Ctrl+Alt+Z` re-pegar;
+  `,`/`.`/`-` eligen perfil y **se suprimen** al escribir. Backend default
+  `WHISPERFLOW_MAC_HOTKEY=cgevent` (CGEventTap nativo vía pyobjc — **suprime** las
+  tone-keys y es el verificado en Mac real; requiere Accesibilidad + Supervisión de
+  entrada). `pynput` es el fallback (NO suprime; puede crashear según versiones de
+  pyobjc). Los atajos son **config-driven** (una sola config sirve en los 3 SO); lo
+  de arriba son los defaults de `.env`.
 
 ## Decisiones no obvias (léelas antes de "arreglar" algo que parece un bug)
 
@@ -88,6 +92,14 @@ Forzable con `WHISPERFLOW_LLM_BACKEND`. Cada reescritura tiene timeout de 30 s y
   se dicta.
 - **`recorder.current_mic_level` es un float sin lock**: lo escribe el callback de
   audio y lo lee el overlay. Es intencional (cosmético; el GIL lo hace seguro).
+- **VAD por energía antes de transcribir** (`core/vad.py`, cableado en
+  `transcribe_and_paste`): Whisper **alucina texto repetido** sobre audio casi mudo
+  (silencio/ruido bajo) — p.ej. `"arrendamos arrendamos…"`. Medido en la Mac de
+  referencia: silencio ~RMS 0.003, dictado real ~0.1–0.2. El VAD descarta la captura
+  si `peak < WHISPERFLOW_VAD_THRESHOLD` (default 0.008) o hay pocas tramas fuertes,
+  **antes** de llamar al modelo. No es un bug: si rechazara dictado real, bajá el
+  umbral o `WHISPERFLOW_VAD=0`. No distingue voz de ruido sostenido (para eso haría
+  falta un VAD neuronal tipo silero).
 - **Ctrl+Win+Espacio siempre pasa por "Ctrl+Win abajo"** primero: se empieza a
   grabar en cuanto ambos modificadores están abajo (cero audio perdido) como
   push-to-talk provisional; si Espacio se suma, la grabación **asciende** a manos
