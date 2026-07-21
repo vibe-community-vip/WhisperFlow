@@ -1,0 +1,35 @@
+{
+  "apply_aliases(case-insensitive)": "Claude y Claude y Claude",
+  "apply_aliases(multiple)": "Claude y SaaS",
+  "apply_aliases(none)": "hola mundo",
+  "apply_aliases(simple)": "uso Claude todos los dias",
+  "apply_aliases(word-boundary)": "clodificar con Claude",
+  "build_initial_prompt(empty)": null,
+  "build_initial_prompt(few)": "Vocabulario y términos técnicos relevantes: Claude, LangChain, RAG.",
+  "build_initial_prompt(many).len": 800,
+  "build_initial_prompt(many).value": "Vocabulario y términos técnicos relevantes: termino0, termino1, termino2, termino3, termino4, termino5, termino6, termino7, termino8, termino9, termino10, termino11, termino12, termino13, termino14, termino15, termino16, termino17, termino18, termino19, termino20, termino21, termino22, termino23, termino24, termino25, termino26, termino27, termino28, termino29, termino30, termino31, termino32, termino33, termino34, termino35, termino36, termino37, termino38, termino39, termino40, termino41, termino42, termino43, termino44, termino45, termino46, termino47, termino48, termino49, termino50, termino51, termino52, termino53, termino54, termino55, termino56, termino57, termino58, termino59, termino60, termino61, termino62, termino63, termino64, termino65, termino66, termino67, termino68, termino",
+  "corrections(empty)": "",
+  "corrections(exact-noop)": "Claude y LangChain",
+  "corrections(fuzzy-single)": "uso clod y LangChain",
+  "corrections(multi-exact)": "uso Wispr Flow y Claude Code",
+  "corrections(multi-fuzzy)": "uso Wispr Flow y Claude Code",
+  "corrections(multi-prefix)": "prueba faster whisper ahora",
+  "corrections(punct)": "(clod) es genial.",
+  "corrections(short-word-skip)": "ai y ar no se corrigen",
+  "load_dictionary(aliases)": [
+    [
+      "clod",
+      "Claude"
+    ],
+    [
+      "SAS",
+      "SaaS"
+    ]
+  ],
+  "load_dictionary(terms)": [
+    "ChatGPT",
+    "Claude",
+    "Claude Code",
+    "SaaS"
+  ]
+}
