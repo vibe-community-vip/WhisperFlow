@@ -10,6 +10,9 @@ env/
 # Historial de transcripciones (generado por la app)
 transcripciones.md
 
+# Historial de recall para Ctrl+Alt+Z (generado por la app, ver core/recall.py)
+last_recordings.json
+
 # Bytecode de Python
 __pycache__/
 *.py[cod]

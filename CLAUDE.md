@@ -66,7 +66,8 @@ Forzable con `WHISPERFLOW_LLM_BACKEND`. Cada reescritura tiene timeout de 30 s y
 
 ### Atajos por SO
 - **Windows / Linux (X11)**: `Ctrl+Win`/`Ctrl+Super` push-to-talk; `+Espacio` manos
-  libres; `Ctrl+Alt+Z` re-pegar; `,`/`.`/`-` eligen perfil (y se **suprimen** al escribir).
+  libres; `Ctrl+Alt+Z` re-pegar (cicla hasta las últimas 3 grabaciones, persistido en
+  disco — ver `core/recall.py`); `,`/`.`/`-` eligen perfil (y se **suprimen** al escribir).
 - **macOS**: `Cmd+Ctrl` PTT; `Cmd+Ctrl+Espacio` manos libres; `Ctrl+Alt+Z` re-pegar;
   `,`/`.`/`-` eligen perfil y **se suprimen** al escribir. Backend default
   `WHISPERFLOW_MAC_HOTKEY=cgevent` (CGEventTap nativo vía pyobjc — **suprime** las
