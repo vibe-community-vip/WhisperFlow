@@ -16,6 +16,12 @@ Atajos:
                             perder el audio ya capturado.
   - Ctrl + Alt + Z       -> vuelve a pegar el último texto transcrito (por si no había
                             campo con foco donde cayó el pegado), igual que Wispr Flow.
+                            Si lo presionas varias veces seguidas SIN dictar nada nuevo
+                            en medio, retrocede a la grabación anterior (hasta las
+                            últimas 3). Dictar algo nuevo reinicia el ciclo a la más
+                            reciente. Este historial se guarda en disco
+                            (last_recordings.json), así que sobrevive a reinicios de
+                            la app.
 
 Perfiles de tono (opcional, mientras grabas, una vez y sin soltar nada más):
   - ,  -> "Amigable"   (cálido, algún emoji)

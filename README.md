@@ -22,7 +22,10 @@ proyectos.
 - **Manos libres** — sigue grabando aunque sueltes las teclas. Para detener y
   transcribir, vuelve a presionar el mismo acorde (o suma `Espacio`).
   - Windows/Linux: `Ctrl + Win + Espacio`  ·  macOS: `Cmd + Ctrl + Espacio`
-- **Re-pegar último** — por si no había ningún campo con foco cuando dictaste.
+- **Re-pegar último** — por si no había ningún campo con foco cuando dictaste. Presionado
+  varias veces seguidas sin dictar nada nuevo en medio, retrocede a las últimas 3
+  grabaciones (dictar algo nuevo reinicia el ciclo). Se persiste en disco
+  (`last_recordings.json`), así que sobrevive a reinicios de la app.
   - Windows/Linux: `Ctrl + Alt + Z`  ·  macOS: `Cmd + Shift + Z`
 
 Mientras grabas, puedes tocar una vez (sin soltar nada más) una de estas teclas para

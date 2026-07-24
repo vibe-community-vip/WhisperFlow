@@ -16,7 +16,7 @@ try:
 except Exception:
     pass
 
-from whisperflow.core import asr, config, history, rewriter, tray, vad
+from whisperflow.core import asr, config, history, recall, rewriter, tray, vad
 from whisperflow.core.recorder import Recorder
 from whisperflow.core.config import SAMPLE_RATE
 from whisperflow.core.dictionary import (
@@ -49,10 +49,6 @@ class Application:
         self._profile_key_held = {k: False for k in self.profile_keys}
         self._selected_profile = None
 
-        # Último texto transcrito (para re-pegar).
-        self._last_text_lock = threading.Lock()
-        self._last_transcribed_text = None
-
         self.debug = config.DEBUG
 
         if not self.ptt_keys:
@@ -72,12 +68,11 @@ class Application:
     def _normalize(name):
         """Nombre canónico de tecla: super/ctrl/alt/shift/space o el carácter tal cual."""
         n = (name or "").lower().strip()
-        if n in ("ctrl", "control", "left ctrl", "right ctrl"):
+        if "ctrl" in n or "control" in n:
             return "ctrl"
-        if n in ("windows", "win", "windows_l", "windows_r", "super", "super_l", "super_r",
-                 "cmd", "command", "cmd_l", "cmd_r", "command_l", "command_r"):
+        if "windows" in n or "super" in n or "cmd" in n or "command" in n:
             return "super"
-        if n in ("alt", "option", "alt_l", "alt_r", "option_l", "option_r", "left alt", "right alt"):
+        if "alt" in n or "option" in n:
             return "alt"
         if n in ("shift", "shift_l", "shift_r", "left shift", "right shift"):
             return "shift"
@@ -211,8 +206,7 @@ class Application:
                 print(f"[whisperflow] reescribiendo con perfil '{profile}'...", flush=True)
                 text = rewriter.rewrite_with_llm(text, profile)
 
-            with self._last_text_lock:
-                self._last_transcribed_text = text
+            recall.remember(text)
             history.append(text, profile)
             self.paste.paste(text)
             print(f"[whisperflow] pegado: {text}", flush=True)
@@ -220,14 +214,17 @@ class Application:
             self.overlay.hide()
 
     def recover_last_text(self):
-        with self._last_text_lock:
-            text = self._last_transcribed_text
+        """Ctrl+Alt+Z: pega la grabación más reciente. Presionado varias veces
+        seguidas SIN dictar nada nuevo en medio, retrocede a la anterior (hasta las
+        últimas ``recall.MAX_RECALL``). Dictar algo nuevo reinicia el ciclo a la más
+        reciente (ver ``transcribe_and_paste`` -> ``recall.remember``)."""
+        text, idx, total = recall.recall_next()
         if not text:
             self.beep.no_speech()
             print("[whisperflow] no hay texto previo que recuperar", flush=True)
             return
         self.paste.paste(text)
-        print(f"[whisperflow] recuperado: {text}", flush=True)
+        print(f"[whisperflow] recuperado ({idx}/{total}): {text}", flush=True)
 
     def _load_model_in_background(self):
         try:

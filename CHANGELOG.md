@@ -5,6 +5,26 @@ Todos los cambios notables de **WhisperFlow** se documentan en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/)
 y este proyecto se rige por [Versionado Semántico](https://semver.org/lang/es/).
 
+## [Unreleased]
+
+### Agregado
+- **Historial persistido para Ctrl+Alt+Z** (`core/recall.py`): recuerda hasta las
+  últimas 3 transcripciones (antes solo la última, y solo en memoria). Presionar
+  Ctrl+Alt+Z varias veces seguidas sin dictar nada nuevo en medio cicla hacia atrás
+  por esas 3; dictar algo nuevo reinicia el ciclo a la más reciente. Se guarda en
+  `last_recordings.json` (raíz del proyecto, en `.gitignore`), así que sobrevive a
+  reinicios de la app — antes ese estado vivía en `Application.
+  _last_transcribed_text` y se perdía en cada reinicio.
+
+### Corregido
+- **Detección de la tecla Windows en `Application._normalize`**: pasó de una lista
+  de coincidencias exactas (`"windows_l"`, `"super_r"`, ...) a una comprobación por
+  substring (como en el monolito original), porque en Windows con configuración
+  regional en español la librería `keyboard` reporta el nombre de la tecla como
+  `"windows izquierda"` / `"left windows"`, que no calzaba con ninguna entrada de la
+  lista — el push-to-talk (`Ctrl+Win`) quedaba completamente inoperante en ese
+  locale.
+
 ## [1.0.0] - 2026-07-20
 
 Primera release. Refactor multiplataforma del monolito original (Windows-only) a
