@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Hotkeys globales en macOS vía CGEventTap nativo (pyobjc/Quartz) — default en Mac.
 
-- **Suprime teclas**: devolviendo ``None`` se traga el evento => las tone-keys
+- **Suprime teclas**: devolviendo ``None`` se traga el evento => una tecla registrada
   ``,``/``.``/``-`` no se escriben mientras se graba (igual que Windows).
 - **No pasa por ``HIServices.AXIsProcessTrusted``** (pynput crashea ahí con algunos
   combos pyobjc). Usa Quartz directo.
@@ -9,7 +9,7 @@
 
 Requiere **Accesibilidad** y **Supervisión de entrada**. Si el tap activo (con supresión)
 no se crea por permisos, cae a un tap solo-escucha (PTT/manos-libres funcionan, pero las
-tone-keys no se suprimen) y avisa claro por consola.
+no hay supresión) y avisa claro por consola.
 """
 import threading
 
@@ -23,7 +23,7 @@ _KC = {
     0x3A: "alt", 0x3D: "alt",            # left/right option
     0x38: "shift", 0x3C: "shift",
     0x31: "space",
-    0x2B: ",", 0x2F: ".", 0x1B: "-",     # tone-keys
+    0x2B: ",", 0x2F: ".", 0x1B: "-",     # teclas registrables por register_suppressible_key
     0x06: "z",
 }
 _MODS = {"super", "ctrl", "alt", "shift"}
@@ -97,7 +97,7 @@ class CGEventTapHotkeyBackend(HotkeyBackend):
                                 pass
                         return None  # tragamos la tecla terminal
 
-                # Tone-keys: despachar y SUPRIMIR si el handler devuelve False.
+                # Despachar y SUPRIMIR si el handler devuelve False.
                 if name in self._suppressible:
                     try:
                         swallow = self._suppressible[name](_Event(name, etype))
@@ -134,7 +134,7 @@ class CGEventTapHotkeyBackend(HotkeyBackend):
                 mask, tap_callback, None)
             if self._tap is not None:
                 print("[whisperflow] Usando tap en modo solo-escucha: PTT/manos-libres OK, "
-                      "pero las tone-keys NO se suprimirán.", flush=True)
+                      "pero no habrá supresión de teclas.", flush=True)
             else:
                 print("[whisperflow] Tampoco se pudo crear el tap. Atajos desactivados.", flush=True)
                 return

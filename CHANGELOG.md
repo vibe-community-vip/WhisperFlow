@@ -7,6 +7,75 @@ y este proyecto se rige por [Versionado Semántico](https://semver.org/lang/es/)
 
 ## [Unreleased]
 
+### Cambiado
+- **Indicador flotante rediseñado.** Se dibuja con Pillow
+  (`core/overlay_render.py`) en lugar de primitivas de `tkinter.Canvas`: cápsula con
+  degradado vertical, borde tenue (el color de estado al 13 % en vez de una línea
+  sólida), luz difusa que nace del punto de estado y de las barras, brillo de vidrio
+  en el filo superior, y tipografía Segoe UI Semilight en minúsculas con *tracking*.
+  El texto lo rasteriza Pillow, no Tk, así que ya no depende de ClearType. Coste
+  medido: ~0.04 ms por frame (fondo y sprites cacheados por estado).
+  El color-key pasó de magenta a un casi-negro `(1,0,1)`: como el colorkey de Windows
+  solo borra el color exacto, el borde antialiaseado dejaba un **fleco fucsia**
+  alrededor de la cápsula.
+- **La animación del overlay se unificó en `core/overlay_base.TkOverlayBase`.** Los
+  tres backends por SO tenían el mismo bucle duplicado; ahora solo implementan
+  `_configure_window` (transparencia y flags de ventana).
+- **Manos libres suena UN solo bip, distinto al de push-to-talk.** Antes se oían
+  tres (uno por cada paso del acorde `Ctrl+Win` → `Espacio`). El bip de inicio ahora
+  se difiere `WHISPERFLOW_HANDSFREE_GRACE_MS` (220 ms) y se cancela si el atajo
+  asciende a manos libres. Se difiere **solo el sonido**: la grabación arranca igual
+  al instante. PTT = 880 Hz corto; manos libres = 620 Hz más largo.
+- **Modelo por defecto: `small` → `medium`.** Medido con `scripts/bench_models.py`
+  en una RTX 4050 de portátil sobre frases en español con vocabulario técnico:
+  `small` 7.8 % WER / 0.48 s · **`medium` 2.3 % / 0.94 s** · `large-v3-turbo` 5.9 % /
+  0.68 s · `large-v3` 3.9 % / 1.41 s. Tres veces menos errores por medio segundo más.
+  En CPU conviene volver a `small` vía `.env`.
+- **`condition_on_previous_text=False`** en ambos motores ASR: cada dictado es
+  independiente y arrastrar el texto anterior es la causa clásica de los bucles de
+  repetición.
+
+### Agregado
+- **Filtro de alucinaciones conocidas** (`core/hallucinations.py`): quita el crédito
+  *"Subtítulos realizados por la comunidad de Amara.org"* que Whisper alucina sobre
+  audio casi mudo. Venía de la instalación monolítica del autor y no había llegado al
+  paquete. Es la cuarta y última red, después del VAD por energía, el `vad_filter`
+  interno y `condition_on_previous_text=False`.
+  Nota: el parámetro `hallucination_silence_threshold` de faster-whisper, que el
+  monolito también pasaba, **es inerte sin `word_timestamps=True`** (está dentro de
+  ese `if` en `transcribe.py`), así que no se portó.
+- **Micrófono siempre armado + pre-roll** (`core/recorder.py`). El `sd.InputStream`
+  se abre al arrancar la app y no se cierra entre dictados; mientras no se graba, el
+  audio cae en un buffer circular de `WHISPERFLOW_PREROLL_MS` (350 ms) que se usa
+  como semilla al pulsar el atajo. Abrir el stream en el momento del atajo costaba
+  **~120 ms medidos** (~470 ms la primera vez) de audio que simplemente no se
+  grababa — de ahí la sensación de que "no graba bien hasta después del bip". Ahora
+  `start()` tarda 0 ms y además entra lo dicho justo antes de pulsar. Se puede volver
+  al comportamiento anterior con `WHISPERFLOW_MIC_ALWAYS_ON=0`.
+- **`scripts/bench_models.py`**: compara modelos locales de Whisper en tu máquina
+  midiendo WER y latencia sobre el mismo audio. Con `--record` graba las frases con
+  tu propia voz (la única medición que de verdad decide) y con `--noise` simula
+  ruido de fondo.
+
+### Quitado
+- **Perfiles de tono amigable/profesional y todo el reescritor por LLM.** Se
+  eliminaron `core/rewriter.py`, las tone-keys `,`/`.`/`-`, la configuración de
+  Ollama/OpenAI (`WHISPERFLOW_LLM_BACKEND`, `WHISPERFLOW_OLLAMA_*`,
+  `WHISPERFLOW_OPENAI_*`, `OPENAI_API_KEY`) y la dependencia `openai`. El dictado es
+  uno solo: lo que se dicta es lo que se pega.
+
+### Corregido
+- **Descarga de modelos en Windows sin modo desarrollador**: se fija
+  `HF_HUB_DISABLE_SYMLINKS=1` antes de importar `faster_whisper`. La caché de Hugging
+  Face usa symlinks y Windows los bloquea, así que bajar un modelo no cacheado
+  fallaba con `WinError 1314` (reproducido con `large-v3-turbo`).
+- **Nombres de tecla localizados en `Application._normalize`**: en un Windows en
+  español la librería `keyboard` reporta Shift como `"mayusculas"`, así que
+  `WHISPERFLOW_PTT_KEYS=shift` no funcionaba fuera de un sistema en inglés. Se
+  agregaron alias para shift/super/alt/space en varios idiomas.
+
+## [1.0.1]
+
 ### Agregado
 - **Historial persistido para Ctrl+Alt+Z** (`core/recall.py`): recuerda hasta las
   últimas 3 transcripciones (antes solo la última, y solo en memoria). Presionar

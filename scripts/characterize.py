@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 """Harness de caracterización para WhisperFlow.
 
-Compara las salidas de las funciones PURAS y multiplataforma (hoy: el diccionario
-de precisión) contra valores "golden" capturados antes. No es un test unitario
+Compara las salidas de las funciones PURAS y multiplataforma (el diccionario de
+precisión y el filtro de alucinaciones) contra valores "golden" capturados antes. No es un test unitario
 tradicional: es una red de seguridad para detectar regresiones silenciosas durante
 la reingeniería (Fase 1), que de otro modo no podría verificarse en macOS porque
 la app completa es Windows-only.
@@ -25,6 +25,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 
 from whisperflow.core import dictionary as D
+from whisperflow.core import hallucinations as H
 
 GOLDEN_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "golden")
 
@@ -85,6 +86,20 @@ def _cases():
         os.unlink(tmp_path)
     out["load_dictionary(terms)"] = terms
     out["load_dictionary(aliases)"] = aliases
+
+    # --- strip_known_hallucinations ---
+    # Lo importante de estos casos es la ASIMETRÍA: si hay crédito alucinado se
+    # limpia; si no lo hay, el texto tiene que volver intacto (puntuación incluida).
+    out["hallucinations(none)"] = H.strip_known_hallucinations(
+        "Gracias por ver el video, nos vemos mañana.")
+    out["hallucinations(trailing)"] = H.strip_known_hallucinations(
+        "Necesito revisar el deploy. Subtítulos realizados por la comunidad de Amara.org")
+    out["hallucinations(only)"] = H.strip_known_hallucinations(
+        "Subtítulos por la comunidad de Amara.org")
+    out["hallucinations(english)"] = H.strip_known_hallucinations(
+        "Subtitles by the Amara.org community")
+    out["hallucinations(empty)"] = H.strip_known_hallucinations("")
+    out["hallucinations(none-value)"] = H.strip_known_hallucinations(None)
 
     return out
 

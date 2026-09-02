@@ -4,8 +4,8 @@ sounddevice
 numpy
 pyperclip
 pystray
+# pillow: bandeja (pystray) y render del indicador flotante (core/overlay_render.py)
 pillow
-openai
 # Linux (X11) y Windows usan la lib "keyboard" para hotkeys globales.
 keyboard ; sys_platform == "win32" or sys_platform == "linux"
 

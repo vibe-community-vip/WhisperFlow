@@ -9,7 +9,7 @@ Aordes (Fase 4, Mac v1):
     con Ctrl/Alt no matchean bien en Mac).
   - Re-pegar último: **Cmd+Shift+Z** (vía GlobalHotKeys; acordes con Cmd/Shift sí
     funcionan en pynput Mac).
-  - Tone-keys (,/./-): se DETECTAN y eligen el perfil, pero **NO se suprimen**
+  - Teclas suprimibles: se DETECTAN, pero **NO se suprimen**
     (capabilities.suppress_supported=False): la tecla se escribe en el campo; el
     usuario la borra. La supresión total requiere CGEventTap (Fase 5).
 """
@@ -48,12 +48,12 @@ class MacOSHotkeyBackend(HotkeyBackend):
         self._listener = None
         self._global_hotkeys = None
         self._controller = pk.Controller()
-        self._suppressible = {}  # nombre(tecla) -> handler (tone-keys; sin supresión real)
+        self._suppressible = {}  # nombre(tecla) -> handler (sin supresión real)
 
     def start(self, on_event):
         def on_press(key):
             name = _key_name(key)
-            # Tone-keys: despachar a su handler si está registrado (registra el perfil,
+            # Despachar al handler si está registrado (el valor de retorno se ignora:
             # pero NO bloquea la tecla — limitación de Mac v1).
             if name in self._suppressible:
                 try:

@@ -7,9 +7,7 @@ del entorno del SO tienen prioridad sobre el ``.env``; el ``.env`` tiene priorid
 sobre los defaults.
 
 Las constantes que antes estaban hardcodeadas en ``whisperflow.py`` se centralizan
-acá, con los MISMOS valores por defecto -> sin cambio de comportamiento si no hay
-``.env``. (La app de Fase 1/2 todavía usa sus propias constantes; Fase 2/3 las migra
-a leer de aquí.)
+acá. Todo lo ajustable de la app pasa por este módulo: no hay UI de configuración.
 """
 import os
 import sys
@@ -67,24 +65,36 @@ def get_bool(name, default=False):
 
 
 # --- Transcripción (faster-whisper) ---
-MODEL_SIZE = get("WHISPERFLOW_MODEL_SIZE", "small")   # tiny|base|small|medium|large-v3
+# tiny|base|small|medium|large-v3|large-v3-turbo (o cualquier repo de HF compatible).
+MODEL_SIZE = get("WHISPERFLOW_MODEL_SIZE", "medium")
 LANGUAGE = get("WHISPERFLOW_LANGUAGE", "es")
 SAMPLE_RATE = int(get("WHISPERFLOW_SAMPLE_RATE", "16000"))
+# beam_size del decodificador: más ancho = un poco más preciso y más lento.
+BEAM_SIZE = int(get("WHISPERFLOW_BEAM_SIZE", "5"))
 
-# --- Backend de reescritura de tono (Fase 3) ---
-LLM_BACKEND = get("WHISPERFLOW_LLM_BACKEND", "auto").lower()    # auto|ollama|openai|none
-OLLAMA_BASE_URL = get("WHISPERFLOW_OLLAMA_BASE_URL", "http://localhost:11434/v1")
-OLLAMA_MODEL = get("WHISPERFLOW_OLLAMA_MODEL", "qwen2.5:3b")
-OPENAI_MODEL = get("WHISPERFLOW_OPENAI_MODEL", "gpt-4.1-nano")
-OPENAI_API_KEY = get("OPENAI_API_KEY", "")
+# --- Micrófono (captura permanente + pre-roll) ---
+# Abrir el stream al pulsar el atajo cuesta ~120 ms reales (medido) y ese audio se
+# perdía. Con el micrófono armado desde el arranque, el instante del atajo se
+# captura completo y el pre-roll rescata lo dicho justo antes. Contrapartida: el
+# indicador de "micrófono en uso" del SO queda encendido siempre (el audio nunca
+# sale de un buffer en memoria que se descarta solo). Poné 0 para volver al modo
+# anterior (abrir/cerrar el micrófono en cada dictado).
+MIC_ALWAYS_ON = get_bool("WHISPERFLOW_MIC_ALWAYS_ON", True)
+PREROLL_MS = int(get("WHISPERFLOW_PREROLL_MS", "350"))
+
+# --- Beeps ---
+# Ventana para cancelar el bip de push-to-talk si el atajo asciende a manos libres
+# (Ctrl+Win y después Espacio). Solo difiere el SONIDO; la grabación empieza igual
+# al instante. 0 = bip inmediato (vuelven a oírse dos tonos al entrar a manos libres).
+HANDSFREE_GRACE_MS = int(get("WHISPERFLOW_HANDSFREE_GRACE_MS", "220"))
 
 # --- Debug ---
 DEBUG = get_bool("WHISPERFLOW_DEBUG", False)
 
 # --- Mac: backend de hotkeys ---
-# cgevent = nativo vía CGEventTap (DEFAULT): SUPRIME las tone-keys (,/./-) y NO pasa
-#   por HIServices.AXIsProcessTrusted (que crashea con algunos combos pynput+pyobjc).
-# pynput = fallback (no suprime tone-keys; puede crashear según versiones de pyobjc).
+# cgevent = nativo vía CGEventTap (DEFAULT): NO pasa por HIServices.AXIsProcessTrusted
+#   (que crashea con algunos combos pynput+pyobjc).
+# pynput = fallback (puede crashear según versiones de pyobjc).
 MAC_HOTKEY = get("WHISPERFLOW_MAC_HOTKEY", "cgevent").lower()
 
 # --- Atajos configurables (nombres canónicos: super, ctrl, alt, shift, space, o un char) ---
@@ -95,24 +105,6 @@ def _csv(s):
 PTT_KEYS = set(_csv(get("WHISPERFLOW_PTT_KEYS", "super,ctrl")))        # modificadores para push-to-talk
 HANDSFREE_KEY = get("WHISPERFLOW_HANDSFREE_KEY", "space").strip()      # asciende a manos libres (con PTT sostenido)
 REPASTE_KEYS = _csv(get("WHISPERFLOW_REPASTE_KEYS", "ctrl,alt,z"))     # acorde para re-pegar último texto
-
-
-def _parse_profile_keys(s):
-    # Formato "k1:perfil|k2:perfil|k3:" separado por '|'. Perfil vacío = normal (None).
-    d = {}
-    for item in (s or "").split("|"):
-        item = item.strip()
-        if not item:
-            continue
-        if ":" in item:
-            k, v = item.split(":", 1)
-            d[k.strip()] = (v.strip() or None)
-        else:
-            d[item] = None
-    return d
-
-
-PROFILE_KEYS = _parse_profile_keys(get("WHISPERFLOW_PROFILE_KEYS", ",:friendly|.:professional|-:"))
 
 # --- Motor ASR ---
 # faster-whisper (ctranslate2) NO soporta Metal: en Apple Silicon es CPU-only.

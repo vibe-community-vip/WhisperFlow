@@ -1,5 +1,9 @@
 # Notas de la versión 1.0.0 — WhisperFlow
 
+> **Nota:** este documento describe la release **1.0.0 tal como se publicó**.
+> Versiones posteriores quitaron la reescritura de tono por LLM (Ollama/OpenAI)
+> y los perfiles amigable/profesional. Ver `CHANGELOG.md` para lo actual.
+
 **Fecha:** 20 de julio de 2026
 **Tag:** [`v1.0.0`](https://github.com/vibe-community-vip/WhisperFlow/releases/tag/v1.0.0)
 **Licencia:** MIT
