@@ -74,14 +74,30 @@ STATE_TEXT = {
 }
 
 # Tipografía: fina y con tracking. Cada SO tiene su equivalente "semilight".
+# Ojo con macOS: SFNSText.ttf existía hasta Catalina; de Big Sur en adelante la fuente
+# del sistema es SFNS.ttf. Se listan las dos, y varias más, porque si NINGUNA carga el
+# fallback es la fuente de mapa de bits de Pillow y el indicador se ve roto.
 _FONT_CANDIDATES = {
     "win32": [r"C:\Windows\Fonts\segoeuisl.ttf", r"C:\Windows\Fonts\segoeuil.ttf",
               r"C:\Windows\Fonts\segoeui.ttf"],
-    "darwin": ["/System/Library/Fonts/SFNSText.ttf",
-               "/System/Library/Fonts/Helvetica.ttc"],
+    "darwin": ["/System/Library/Fonts/SFNS.ttf",              # Big Sur en adelante
+               "/System/Library/Fonts/SFNSText.ttf",          # hasta Catalina
+               "/System/Library/Fonts/SFNSDisplay.ttf",
+               "/System/Library/Fonts/HelveticaNeue.ttc",
+               "/System/Library/Fonts/Helvetica.ttc",
+               "/System/Library/Fonts/Supplemental/Arial.ttf"],
     "linux": ["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-              "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"],
+              "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+              "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+              "/usr/share/fonts/TTF/DejaVuSans.ttf",          # Arch
+              "/usr/share/fonts/dejavu/DejaVuSans.ttf",       # Fedora
+              "/usr/share/fonts/noto/NotoSans-Regular.ttf",
+              "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf"],
 }
+# Si ninguna de las rutas de arriba existe (distros con otro layout), se busca
+# cualquier .ttf en estos directorios antes de rendirse al fallback de mapa de bits.
+_FONT_DIRS = ["/usr/share/fonts", "/usr/local/share/fonts",
+              "/System/Library/Fonts", "/Library/Fonts"]
 FONT_SIZE = 11        # px del render final (se multiplica por SS al rasterizar)
 TRACKING = 1.5        # espaciado extra entre letras, en px finales
 
@@ -94,6 +110,20 @@ def _load_font(size_px):
                 return ImageFont.truetype(path, size_px)
             except Exception:
                 continue
+    # Red de seguridad: la primera .ttf utilizable que aparezca en el sistema. Fea
+    # quizá, pero legible — mejor que la fuente de mapa de bits de Pillow.
+    for base in _FONT_DIRS:
+        if not os.path.isdir(base):
+            continue
+        for root, _dirs, files in os.walk(base):
+            for name in sorted(files):
+                if name.lower().endswith(".ttf"):
+                    try:
+                        return ImageFont.truetype(os.path.join(root, name), size_px)
+                    except Exception:
+                        continue
+    print("[whisperflow] no se encontró ninguna fuente TrueType; el indicador usará "
+          "la fuente por defecto de Pillow y se verá peor.", flush=True)
     try:
         return ImageFont.load_default(size_px)
     except Exception:

@@ -1,4 +1,4 @@
-# setup.ps1 — Instalador guiado de WhisperFlow local para Windows.
+﻿# setup.ps1 — Instalador guiado de WhisperFlow local para Windows.
 # Crea el entorno virtual, instala dependencias (CUDA opcional), pregunta por el
 # modelo de transcripción, escribe el .env y (opcional)
 # instala el arranque automático. Pensado para no-desarrolladores.
@@ -68,6 +68,18 @@ $lines = @(
     "WHISPERFLOW_LANGUAGE=es"
 )
 $lines | Out-File -FilePath $envFile -Encoding utf8
+
+# ---------------- Diccionario personal ----------------
+# dictionary.txt NO se versiona (suele llenarse de nombres de clientes y jerga
+# propia). Se crea copiando la plantilla, y solo si todavía no existe: nunca hay
+# que pisar el diccionario que el usuario ya venía construyendo.
+$dict = Join-Path $here "dictionary.txt"
+if (-not (Test-Path $dict)) {
+    Copy-Item (Join-Path $here "dictionary.example.txt") $dict
+    Write-Host "dictionary.txt creado desde la plantilla — agregá ahí tus términos." -ForegroundColor Green
+} else {
+    Write-Host "dictionary.txt ya existe, se deja como está." -ForegroundColor Yellow
+}
 Write-Host ".env escrito en $envFile" -ForegroundColor Green
 
 # ---------------- Arranque automático (opcional) ----------------

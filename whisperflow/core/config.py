@@ -23,7 +23,11 @@ def _load_env_file(path):
     """Lee KEY=VALUE de un .env. Ignora comentarios (#) y vacías; comillas opcionales."""
     data = {}
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        # utf-8-sig y no utf-8: el Bloc de notas de Windows y el Out-File de
+        # PowerShell guardan con BOM. Con utf-8 puro, ese BOM se pega al nombre de
+        # la PRIMERA clave ("﻿WHISPERFLOW_LANGUAGE") y esa línea se pierde en
+        # silencio. utf-8-sig lo descarta y es idéntico si no hay BOM.
+        with open(path, "r", encoding="utf-8-sig") as f:
             for raw in f:
                 line = raw.strip()
                 if not line or line.startswith("#") or "=" not in line:

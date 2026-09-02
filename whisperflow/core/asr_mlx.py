@@ -15,6 +15,7 @@ from whisperflow.core import config
 _load_lock = threading.Lock()
 _loaded = False
 _model = None  # repo que efectivamente se cargó (usado en transcribe)
+_no_condition_kwarg = False  # avisar una sola vez si mlx no soporta el argumento
 
 
 def ensure_loaded():
@@ -58,7 +59,22 @@ def transcribe(audio, language=None, initial_prompt=None):
     lang = language or config.LANGUAGE
     # condition_on_previous_text=False por el mismo motivo que en asr_ct2: cada
     # dictado es independiente y arrastrar contexto dispara bucles de repetición.
-    result = mlx_whisper.transcribe(audio, path_or_hf_repo=_model or config.MLX_MODEL,
-                                    language=lang, initial_prompt=initial_prompt,
-                                    condition_on_previous_text=False)
+    #
+    # El try/except NO es paranoia decorativa: este backend solo corre en Apple
+    # Silicon y no se pudo ejecutar durante el desarrollo. Si alguna versión de
+    # mlx-whisper no acepta ese argumento, sin esto CADA dictado moriría con
+    # TypeError dentro del hilo de transcripción — es decir, la app parecería
+    # "no transcribir nada" sin explicar por qué. Preferimos perder la opción.
+    kwargs = dict(path_or_hf_repo=_model or config.MLX_MODEL, language=lang,
+                  initial_prompt=initial_prompt, condition_on_previous_text=False)
+    try:
+        result = mlx_whisper.transcribe(audio, **kwargs)
+    except TypeError as e:
+        global _no_condition_kwarg
+        if not _no_condition_kwarg:
+            print(f"[whisperflow] mlx-whisper no acepta condition_on_previous_text "
+                  f"({e}); se sigue sin esa opción.", flush=True)
+            _no_condition_kwarg = True
+        kwargs.pop("condition_on_previous_text", None)
+        result = mlx_whisper.transcribe(audio, **kwargs)
     return (result.get("text") or "").strip()
