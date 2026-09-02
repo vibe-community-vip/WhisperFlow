@@ -85,6 +85,17 @@ ENV_FILE="$HERE/.env"
 } > "$ENV_FILE"
 echo ".env escrito en $ENV_FILE"
 
+# ---------------- Diccionario personal ----------------
+# dictionary.txt NO se versiona (suele llenarse de nombres de clientes y jerga
+# propia). Se crea copiando la plantilla, y solo si todavía no existe: nunca hay
+# que pisar el diccionario que el usuario ya venía construyendo.
+if [ ! -f "$HERE/dictionary.txt" ]; then
+    cp "$HERE/dictionary.example.txt" "$HERE/dictionary.txt"
+    echo "dictionary.txt creado desde la plantilla — agregá ahí tus términos."
+else
+    echo "dictionary.txt ya existe, se deja como está."
+fi
+
 # ---------------- Arranque automático (opcional) ----------------
 printf "¿Arranque automático al iniciar sesión? [s/N]: "
 read -r AUTOSTART

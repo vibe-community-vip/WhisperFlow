@@ -25,7 +25,9 @@ _lock = threading.Lock()
 
 def _load_history():
     try:
-        with open(RECALL_PATH, "r", encoding="utf-8") as f:
+        # utf-8-sig: json.load revienta con "Unexpected UTF-8 BOM" si el archivo
+        # se regeneró con una herramienta que lo agrega (verificado).
+        with open(RECALL_PATH, "r", encoding="utf-8-sig") as f:
             data = json.load(f)
         if isinstance(data, list):
             return deque((t for t in data if isinstance(t, str)), maxlen=MAX_RECALL)

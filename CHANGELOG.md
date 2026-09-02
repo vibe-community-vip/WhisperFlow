@@ -36,6 +36,9 @@ y este proyecto se rige por [Versionado Semántico](https://semver.org/lang/es/)
   repetición.
 
 ### Agregado
+- **Guía de instalación paso a paso** (`INSTALACION.md`), escrita para seguirla sin
+  saber programar, con una sección de problemas reales (atajo que no responde, app
+  que se cierra, dictado lento, VAD demasiado estricto) y enlazada desde el README.
 - **Filtro de alucinaciones conocidas** (`core/hallucinations.py`): quita el crédito
   *"Subtítulos realizados por la comunidad de Amara.org"* que Whisper alucina sobre
   audio casi mudo. Venía de la instalación monolítica del autor y no había llegado al
@@ -57,6 +60,14 @@ y este proyecto se rige por [Versionado Semántico](https://semver.org/lang/es/)
   tu propia voz (la única medición que de verdad decide) y con `--noise` simula
   ruido de fondo.
 
+### Seguridad
+- **El diccionario personal ya no se versiona.** `dictionary.txt` pasó a `.gitignore`
+  y se agregó `dictionary.example.txt` como plantilla versionada. El diccionario real
+  se llena de nombres de clientes, proyectos y jerga propia, y este repo es público:
+  antes cualquier `git add -A` los publicaba. Los instaladores crean `dictionary.txt`
+  copiando la plantilla (sin pisar uno existente) y, si no existe, la app lee la
+  plantilla para que un clon recién bajado funcione igual.
+
 ### Quitado
 - **Perfiles de tono amigable/profesional y todo el reescritor por LLM.** Se
   eliminaron `core/rewriter.py`, las tone-keys `,`/`.`/`-`, la configuración de
@@ -69,6 +80,11 @@ y este proyecto se rige por [Versionado Semántico](https://semver.org/lang/es/)
   `HF_HUB_DISABLE_SYMLINKS=1` antes de importar `faster_whisper`. La caché de Hugging
   Face usa symlinks y Windows los bloquea, así que bajar un modelo no cacheado
   fallaba con `WinError 1314` (reproducido con `large-v3-turbo`).
+- **Los archivos de texto se leen con `utf-8-sig`** (`.env`, el diccionario y
+  `last_recordings.json`). El Bloc de notas de Windows y el `Out-File` de PowerShell
+  guardan con BOM; con `utf-8` puro ese BOM se pegaba al primer valor y la línea se
+  perdía en silencio — o hacía reventar `json.load` con "Unexpected UTF-8 BOM"
+  (reproducido).
 - **Nombres de tecla localizados en `Application._normalize`**: en un Windows en
   español la librería `keyboard` reporta Shift como `"mayusculas"`, así que
   `WHISPERFLOW_PTT_KEYS=shift` no funcionaba fuera de un sistema en inglés. Se

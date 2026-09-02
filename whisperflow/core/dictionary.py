@@ -10,7 +10,14 @@ Tres mecanismos, igual que Wispr Flow y apps similares:
      no exacto a un término, se reemplaza por la grafía correcta (comparando
      similitud de texto, tolera errores fonéticos leves).
 
-``dictionary.txt`` se relee en cada dictado, así que se puede editar sin reiniciar.
+**Dos archivos, a propósito**: ``dictionary.example.txt`` es la plantilla que se
+versiona, y ``dictionary.txt`` es el diccionario real del usuario, que NO se versiona
+(está en ``.gitignore``). El diccionario personal se llena de nombres de clientes,
+proyectos y jerga propia, y este repo es público: separarlos evita publicarlos por
+accidente. Si ``dictionary.txt`` no existe se lee la plantilla, así que un clon recién
+bajado funciona igual.
+
+El archivo se relee en cada dictado, así que se puede editar sin reiniciar.
 
 Este módulo es deliberadamente puro (solo stdlib: ``os``/``re``/``string``/
 ``difflib``) para poder ejecutarse y testearse en cualquier plataforma, incluido
@@ -27,7 +34,8 @@ import string
 _HERE = os.path.dirname(os.path.abspath(__file__))      # .../whisperflow/core
 _PKG = os.path.dirname(_HERE)                            # .../whisperflow
 PROJECT_ROOT = os.path.dirname(_PKG)                     # <project>
-DICTIONARY_PATH = os.path.join(PROJECT_ROOT, "dictionary.txt")
+DICTIONARY_PATH = os.path.join(PROJECT_ROOT, "dictionary.txt")           # el tuyo (git-ignored)
+DICTIONARY_EXAMPLE_PATH = os.path.join(PROJECT_ROOT, "dictionary.example.txt")  # plantilla versionada
 
 # Tope del initial_prompt. OJO, es un límite real y se alcanza rápido: Whisper
 # reserva ~224 tokens para el prompt, así que un diccionario grande NO entra entero
@@ -44,14 +52,27 @@ SINGLE_WORD_THRESHOLD = 0.82  # umbral más exigente para palabras sueltas (más
 MIN_WORD_LEN_FOR_FUZZY = 4    # palabras muy cortas no se corrigen (demasiado ambiguas)
 
 
+def active_dictionary_path():
+    """Ruta del diccionario que se va a leer: el personal si existe, si no la
+    plantilla. Nunca crea archivos (esto corre en cada dictado)."""
+    if os.path.exists(DICTIONARY_PATH):
+        return DICTIONARY_PATH
+    if os.path.exists(DICTIONARY_EXAMPLE_PATH):
+        return DICTIONARY_EXAMPLE_PATH
+    return None
+
+
 def load_dictionary():
     """Devuelve (terms, aliases): terms = vocabulario plano; aliases = lista de
     (texto_mal_transcrito, texto_correcto) definidos con la sintaxis 'mal=>bien'."""
     terms, aliases = [], []
-    if not os.path.exists(DICTIONARY_PATH):
+    path = active_dictionary_path()
+    if path is None:
         return terms, aliases
     try:
-        with open(DICTIONARY_PATH, "r", encoding="utf-8") as f:
+        # utf-8-sig: si el archivo se editó con el Bloc de notas puede traer BOM,
+        # y con utf-8 puro el primer término del diccionario quedaría corrupto.
+        with open(path, "r", encoding="utf-8-sig") as f:
             for line in f:
                 line = line.strip()
                 if not line or line.startswith("#"):
@@ -66,7 +87,7 @@ def load_dictionary():
                 elif line not in terms:
                     terms.append(line)
     except Exception as e:
-        print(f"[whisperflow] no se pudo leer dictionary.txt: {e}", flush=True)
+        print(f"[whisperflow] no se pudo leer {os.path.basename(path)}: {e}", flush=True)
     return terms, aliases
 
 

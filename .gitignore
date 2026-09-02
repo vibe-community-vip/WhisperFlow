@@ -31,3 +31,7 @@ debug_err.log
 Thumbs.db
 .vscode/
 .idea/
+
+# Diccionario personal (nombres de clientes, proyectos, jerga propia).
+# Se crea copiando dictionary.example.txt; NO se versiona a propósito.
+dictionary.txt

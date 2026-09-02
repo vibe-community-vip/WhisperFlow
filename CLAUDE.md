@@ -170,6 +170,21 @@ interfaz de hotkeys pero **ya nadie la usa** (era para las tone-keys de perfil).
   liberar `alt`, un pegado disparado por Ctrl+Alt+Z mandaría Ctrl+Alt+V (que no pega).
 - **`on_quit` usa `os._exit(0)`**: con hilos daemon + el mainloop de pystray, un
   apagado "limpio" colgaría la salida.
+- **El diccionario son DOS archivos**: `dictionary.example.txt` (plantilla, se
+  versiona) y `dictionary.txt` (el del usuario, en `.gitignore`). El personal se
+  llena de nombres de clientes y jerga propia y este repo es público. Si
+  `dictionary.txt` no existe se lee la plantilla (`active_dictionary_path`), así que
+  un clon recién bajado funciona; los instaladores copian una en la otra, y **nunca
+  pisan** un `dictionary.txt` existente.
+- **Los archivos de texto se leen con `utf-8-sig`, no `utf-8`** (`.env`,
+  `dictionary.txt`, `last_recordings.json`). El Bloc de notas de Windows y el
+  `Out-File` de PowerShell guardan con BOM; con `utf-8` puro ese BOM se pega al
+  primer valor y la línea se pierde en silencio (o revienta `json.load`, verificado).
+- **`setup.ps1` DEBE guardarse con BOM (UTF-8 with signature).** Windows PowerShell
+  5.1 asume ANSI cuando no hay BOM, y los acentos del script se corrompen hasta
+  romper el parseo (verificado: 4 errores de sintaxis). `install.sh`, al revés, NO
+  debe tener BOM: rompería el shebang. Si editás `setup.ps1` con una herramienta que
+  reescribe el archivo, comprobá los primeros bytes.
 - **`install_startup.py` usa `dirname(sys.executable)`** (no `sys.exec_prefix`) para
   ubicar `pythonw.exe` en el venv de Windows (`<venv>\Scripts\`).
 - **La supresión de teclas en macOS quedó sin uso**: pynput no suprime de forma

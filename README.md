@@ -53,6 +53,10 @@ Si prefieres el comportamiento anterior, `WHISPERFLOW_MIC_ALWAYS_ON=0`.
 
 ## Instalación
 
+> **¿Es tu primera vez?** Hay una **[guía paso a paso](INSTALACION.md)** escrita para
+> seguirla sin saber programar, con la sección de problemas reales al final. Lo de
+> abajo es el resumen para quien ya se maneja.
+
 ### Windows
 1. Copia esta carpeta a tu computadora.
 2. Clic derecho sobre `setup.ps1` → "Ejecutar con PowerShell" (o `.\setup.ps1`).
@@ -132,6 +136,9 @@ de un segundo de espera. En CPU la cuenta cambia por completo — ahí `small` g
 - **`dictionary.txt`** — vocabulario propio (nombres, herramientas, jerga) para que
   Whisper transcriba mejor esos términos. Se relee en cada dictado: edítalo sin
   reiniciar. Las instrucciones están dentro del archivo.
+  Este archivo **no se versiona** (suele llenarse de nombres de clientes y proyectos);
+  los instaladores lo crean copiando `dictionary.example.txt`, que es la plantilla que
+  sí está en el repo. Si `dictionary.txt` no existe, la app lee la plantilla.
 - **Ícono en la bandeja** — clic derecho → "Salir" para cerrar la app.
 - Casi cualquier otra cosa es una constante en `whisperflow/core/*.py` o una entrada
   del `.env`.
