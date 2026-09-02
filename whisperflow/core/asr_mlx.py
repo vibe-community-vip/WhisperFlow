@@ -56,6 +56,9 @@ def is_loaded():
 def transcribe(audio, language=None, initial_prompt=None):
     import mlx_whisper
     lang = language or config.LANGUAGE
+    # condition_on_previous_text=False por el mismo motivo que en asr_ct2: cada
+    # dictado es independiente y arrastrar contexto dispara bucles de repetición.
     result = mlx_whisper.transcribe(audio, path_or_hf_repo=_model or config.MLX_MODEL,
-                                    language=lang, initial_prompt=initial_prompt)
+                                    language=lang, initial_prompt=initial_prompt,
+                                    condition_on_previous_text=False)
     return (result.get("text") or "").strip()

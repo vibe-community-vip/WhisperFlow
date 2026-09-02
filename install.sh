@@ -2,7 +2,7 @@
 # install.sh — Instalador guiado de WhisperFlow local para macOS y Linux.
 # Pensado para no-desarrolladores: detecta el SO, crea el venv, instala dependencias
 # (incluidas las del SO: xclip/xdotool/wl-clipboard/wtype en Linux), pregunta por el
-# backend de tono (Ollama local / OpenAI / ninguno), escribe el .env y (opcional)
+# modelo de transcripción, escribe el .env y (opcional)
 # instala el arranque automático y guía los permisos.
 #
 # Uso:  bash install.sh
@@ -48,62 +48,40 @@ echo "Actualizando pip e instalando dependencias (puede tardar varios minutos)..
 "$PY" -m pip install --upgrade pip
 "$PY" -m pip install -r requirements.txt
 
-# ---------------- Backend de tono ----------------
-echo
-echo "¿Quieres la reescritura de tono (perfiles amigable/profesional)?"
-echo "  1) Ollama LOCAL (recomendado: offline, gratis, privado)"
-echo "  2) OpenAI (cloud, pago; pide tu API key)"
-echo "  3) Ninguna (pega el texto tal cual)"
-printf "Elige [1/2/3] (por defecto 1): "
-read -r CHOICE
-CHOICE="${CHOICE:-1}"
-
-LLM_BACKEND="none"
-OLLAMA_MODEL="qwen2.5:3b"
-OPENAI_KEY_LINE=""
-
-if [ "$CHOICE" = "1" ]; then
-    LLM_BACKEND="ollama"
-    echo "Instalando Ollama..."
-    if ! command -v ollama >/dev/null 2>&1; then
-        if [ "$OS" = "Darwin" ] && command -v brew >/dev/null 2>&1; then
-            brew install ollama
-            brew services start ollama
-        else
-            curl -fsSL https://ollama.com/install.sh | sh
-        fi
-    fi
-    echo "Descargando el modelo '$OLLAMA_MODEL' (la primera vez tarda)..."
-    ollama pull "$OLLAMA_MODEL" || echo "  (no se pudo descargar ahora; corré 'ollama pull $OLLAMA_MODEL' más tarde)"
-elif [ "$CHOICE" = "2" ]; then
-    LLM_BACKEND="openai"
-    printf "Pega tu OPENAI_API_KEY (no se hace eco): "
-    read -rs KEY
-    OPENAI_KEY_LINE="OPENAI_API_KEY=$KEY"
-    echo
+# ---------------- Modelo de transcripción ----------------
+# El tamaño del modelo es LA decisión que define exactitud vs. espera. Con GPU
+# NVIDIA, "medium" da ~3x menos errores que "small" por ~0.5 s más (medido en una
+# RTX 4050; ver scripts/bench_models.py). En CPU, "medium" se siente lento.
+if [ "$OS" = "Darwin" ]; then
+    MODEL_DEFAULT="base"        # mlx en Apple Silicon usa WHISPERFLOW_MLX_MODEL aparte
+elif command -v nvidia-smi >/dev/null 2>&1; then
+    MODEL_DEFAULT="medium"
 else
-    LLM_BACKEND="none"
+    MODEL_DEFAULT="small"
 fi
+
+echo
+echo "¿Qué modelo de Whisper querés usar?"
+echo "  1) small    — el más rápido, el que más se equivoca"
+echo "  2) medium   — 3x menos errores que small; ~0.9 s por frase con GPU NVIDIA"
+echo "  3) large-v3 — el más pesado (~3 GB de VRAM); más lento y no siempre mejor"
+echo "  (podés cambiarlo cuando quieras editando .env, y compararlos con"
+echo "   'python scripts/bench_models.py --record --audio-dir bench_audio')"
+printf "Elige [1/2/3] (por defecto: %s): " "$MODEL_DEFAULT"
+read -r CHOICE
+case "$CHOICE" in
+    1) MODEL_SIZE="small" ;;
+    2) MODEL_SIZE="medium" ;;
+    3) MODEL_SIZE="large-v3" ;;
+    *) MODEL_SIZE="$MODEL_DEFAULT" ;;
+esac
 
 # ---------------- Escribir .env ----------------
 ENV_FILE="$HERE/.env"
 {
-    echo "# Generado por install.sh — editá lo que quieras."
-    if [ "$OS" = "Darwin" ]; then
-        echo "WHISPERFLOW_MODEL_SIZE=base   # en Mac (Apple Silicon, CPU) recomiendo base/tiny"
-    else
-        echo "WHISPERFLOW_MODEL_SIZE=small"
-    fi
+    echo "# Generado por install.sh — editá lo que quieras (ver .env.example para todas las claves)."
+    echo "WHISPERFLOW_MODEL_SIZE=$MODEL_SIZE"
     echo "WHISPERFLOW_LANGUAGE=es"
-    echo "WHISPERFLOW_LLM_BACKEND=$LLM_BACKEND"
-    if [ "$LLM_BACKEND" = "ollama" ]; then
-        echo "WHISPERFLOW_OLLAMA_BASE_URL=http://localhost:11434/v1"
-        echo "WHISPERFLOW_OLLAMA_MODEL=$OLLAMA_MODEL"
-    fi
-    if [ "$LLM_BACKEND" = "openai" ]; then
-        echo "$OPENAI_KEY_LINE"
-        echo "WHISPERFLOW_OPENAI_MODEL=gpt-4.1-nano"
-    fi
 } > "$ENV_FILE"
 echo ".env escrito en $ENV_FILE"
 

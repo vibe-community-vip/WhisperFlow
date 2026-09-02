@@ -1,19 +1,20 @@
 # -*- coding: utf-8 -*-
 """whisperflow.py — Dictado por voz local, offline, sin suscripción (reemplazo de Wispr Flow).
 
-Shim de compatibilidad: el código vive ahora en el paquete ``whisperflow/`` (rama
-``refactor/cross-platform``). Este archivo conserva el comando de ejecución original
-(``python whisperflow.py``) y sirve de documentación de los atajos.
+Shim de compatibilidad: el código vive ahora en el paquete ``whisperflow/``. Este
+archivo conserva el comando de ejecución original (``python whisperflow.py``) y sirve
+de documentación de los atajos.
 
 Atajos:
   - Ctrl + Win           -> push-to-talk puro: habla mientras sostienes ambas teclas;
                             al soltar cualquiera de las dos, transcribe y pega.
   - Ctrl + Win + Espacio -> modo "manos libres": sigue grabando aunque sueltes las
-                            teclas. Para detener y transcribir, vuelve a presionar
-                            Ctrl+Win (no hace falta tocar Espacio otra vez) o repite
-                            Ctrl+Win+Espacio. Si ya estabas en push-to-talk y agregas
-                            Espacio a mitad, la grabación asciende a manos libres sin
-                            perder el audio ya capturado.
+                            teclas. Suena UN bip distinto (más grave) al de
+                            push-to-talk. Para detener y transcribir, vuelve a
+                            presionar Ctrl+Win (no hace falta tocar Espacio otra vez)
+                            o repite Ctrl+Win+Espacio. Si ya estabas en push-to-talk y
+                            agregas Espacio a mitad, la grabación asciende a manos
+                            libres sin perder el audio ya capturado.
   - Ctrl + Alt + Z       -> vuelve a pegar el último texto transcrito (por si no había
                             campo con foco donde cayó el pegado), igual que Wispr Flow.
                             Si lo presionas varias veces seguidas SIN dictar nada nuevo
@@ -23,15 +24,15 @@ Atajos:
                             (last_recordings.json), así que sobrevive a reinicios de
                             la app.
 
-Perfiles de tono (opcional, mientras grabas, una vez y sin soltar nada más):
-  - ,  -> "Amigable"   (cálido, algún emoji)
-  - .  -> "Profesional" (directo, técnico)
-  - -  -> "Normal"     (cancela el perfil; pega tal cual, sin pasar por el LLM)
-Estas teclas se bloquean (no se escriben) solo mientras se graba. Requieren un backend
-de LLM: OpenAI (con OPENAI_API_KEY) o, a partir de la Fase 3, Ollama local.
+No hay modos ni perfiles de tono: lo que dictas es lo que se pega.
 
-Motor: faster-whisper, modelo "small", español; GPU (CUDA) si está disponible con
-fallback automático a CPU. El texto se pega en el campo con foco vía portapapeles + Ctrl+V.
+El micrófono queda armado desde que arranca la app, así que la grabación empieza
+exactamente cuando pulsas el atajo (y rescata los ~350 ms previos). Ver
+``core/recorder.py``.
+
+Motor: faster-whisper, modelo "medium" por defecto, español; GPU (CUDA) si está
+disponible con fallback automático a CPU. El texto se pega en el campo con foco vía
+portapapeles + Ctrl+V.
 """
 from whisperflow.app import main
 

@@ -29,7 +29,16 @@ _PKG = os.path.dirname(_HERE)                            # .../whisperflow
 PROJECT_ROOT = os.path.dirname(_PKG)                     # <project>
 DICTIONARY_PATH = os.path.join(PROJECT_ROOT, "dictionary.txt")
 
-MAX_PROMPT_CHARS = 800        # initial_prompt de faster-whisper no debe ser larguísimo
+# Tope del initial_prompt. OJO, es un límite real y se alcanza rápido: Whisper
+# reserva ~224 tokens para el prompt, así que un diccionario grande NO entra entero
+# (medido con un dictionary.txt de 92 términos: el prompt daba 949 chars y se
+# recortan los últimos ~15 términos). Eso NO los deja sin efecto: la corrección
+# difusa de más abajo se aplica a TODOS los términos después de transcribir, y es
+# la que hace el trabajo pesado. El initial_prompt solo sesga la decodificación.
+# Conclusión práctica: poné primero en dictionary.txt los términos que más te
+# importa que el modelo acierte "de una", y usá alias (``mal => bien``) para los
+# errores que se repiten siempre igual.
+MAX_PROMPT_CHARS = 800
 MULTI_WORD_THRESHOLD = 0.68   # umbral de similitud para frases de varias palabras
 SINGLE_WORD_THRESHOLD = 0.82  # umbral más exigente para palabras sueltas (más riesgo de falso positivo)
 MIN_WORD_LEN_FOR_FUZZY = 4    # palabras muy cortas no se corrigen (demasiado ambiguas)

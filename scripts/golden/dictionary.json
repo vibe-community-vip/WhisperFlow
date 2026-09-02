@@ -16,6 +16,12 @@
   "corrections(multi-prefix)": "prueba faster whisper ahora",
   "corrections(punct)": "(clod) es genial.",
   "corrections(short-word-skip)": "ai y ar no se corrigen",
+  "hallucinations(empty)": "",
+  "hallucinations(english)": "",
+  "hallucinations(none)": "Gracias por ver el video, nos vemos mañana.",
+  "hallucinations(none-value)": null,
+  "hallucinations(only)": "",
+  "hallucinations(trailing)": "Necesito revisar el deploy",
   "load_dictionary(aliases)": [
     [
       "clod",

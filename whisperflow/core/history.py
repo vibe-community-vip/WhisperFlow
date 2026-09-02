@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """Historial de transcripciones en markdown (activo por defecto).
 
-Cada transcripción se **anexa** a un archivo markdown con marca de tiempo y el perfil
-de tono si lo hubo. Es un simple archivo de texto local — no sale de la máquina.
+Cada transcripción se **anexa** a un archivo markdown con marca de tiempo. Es un
+simple archivo de texto local — no sale de la máquina.
 
 Configuración (ver ``.env``):
   - ``WHISPERFLOW_HISTORY``: ``1`` (default, activado) o ``0`` (desactivado).
@@ -21,8 +21,6 @@ from whisperflow.core import config
 
 _lock = threading.Lock()
 
-_PROFILE_LABEL = {"friendly": "amigable", "professional": "profesional"}
-
 
 def _history_path() -> str:
     custom = config.get("WHISPERFLOW_HISTORY_FILE", "").strip()
@@ -35,16 +33,13 @@ def _enabled() -> bool:
     return config.get_bool("WHISPERFLOW_HISTORY", True)
 
 
-def append(text, profile=None):
+def append(text):
     """Anexa una transcripción al historial markdown. No lanza."""
     text = (text or "").strip()
     if not text or not _enabled():
         return
     try:
-        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        header = f"### {ts}"
-        if profile:
-            header += f"  · perfil: {_PROFILE_LABEL.get(profile, profile)}"
+        header = "### " + datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         # Blockquote: prefijar cada línea con "> " (manejamos textos multilínea).
         quoted = "\n".join("> " + line for line in text.splitlines())

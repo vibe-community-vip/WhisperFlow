@@ -7,7 +7,15 @@ Carga perezosa. ``register_cuda_dlls()`` debe ejecutarse ANTES de importar Whisp
 import os
 import threading
 
-from whisperflow.core.config import MODEL_SIZE, LANGUAGE
+from whisperflow.core.config import BEAM_SIZE, LANGUAGE, MODEL_SIZE
+
+# Windows sin "modo desarrollador" no deja crear symlinks, y la caché de Hugging Face
+# los usa por defecto: descargar un modelo que todavía no esté cacheado revienta con
+# "WinError 1314: El cliente no dispone de un privilegio requerido" (verificado al
+# bajar large-v3-turbo). Con esto la caché copia en vez de enlazar y la descarga
+# funciona sin permisos especiales. Hay que ponerlo ANTES de importar nada de HF.
+os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS", "1")
+os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 
 _load_lock = threading.Lock()
 MODEL = None  # carga perezosa
@@ -58,7 +66,14 @@ def is_loaded():
 
 def transcribe(audio, language=LANGUAGE, initial_prompt=None):
     ensure_loaded()
-    segments, _ = MODEL.transcribe(audio, language=language, beam_size=5,
-                                   vad_filter=True, condition_on_previous_text=True,
-                                   initial_prompt=initial_prompt)
+    segments, _ = MODEL.transcribe(
+        audio, language=language, beam_size=BEAM_SIZE,
+        vad_filter=True,
+        # condition_on_previous_text=False: cada dictado es independiente, no la
+        # continuación del anterior. Con True, Whisper arrastra el texto ya decodificado
+        # como contexto y es la causa clásica de los bucles de repetición ("...y y y y").
+        # Ojo: NO desactiva el initial_prompt — este sí llega al primer bloque de 30 s,
+        # que es donde cae cualquier dictado normal (verificado con el diccionario real).
+        condition_on_previous_text=False,
+        initial_prompt=initial_prompt)
     return "".join(s.text for s in segments).strip()
