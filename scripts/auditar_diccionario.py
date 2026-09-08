@@ -131,6 +131,19 @@ def main():
             problemas += 1
             print(f"  AMBIGUO    '{mal}' es alias (=> {bien}) Y término a la vez")
 
+    # Un término escrito con otra grafía que el destino de un alias: el alias corrige
+    # y la corrección difusa lo DESHACE. Caso real: alias "SAS => SaaS" con el término
+    # "saas" en minúscula -> "SAS" pasaba a "SaaS" y volvía a "saas".
+    destinos_por_clave = {}
+    for _mal, bien in aliases:
+        destinos_por_clave.setdefault(bien.lower(), bien)
+    for t in terms:
+        destino = destinos_por_clave.get(t.lower())
+        if destino is not None and destino != t:
+            problemas += 1
+            print(f"  SE ANULAN  el término '{t}' deshace el alias que produce "
+                  f"'{destino}' (misma palabra, distinta grafía) — dejá solo '{destino}'")
+
     # Frases comunes: el guardarraíl ya las excluye, pero conviene saberlo.
     comunes = [t for t in terms if D.es_frase_comun(t)]
     for t in comunes:
@@ -153,11 +166,13 @@ def main():
                 problemas += 1
                 print(f"  RIESGOSO   '{t}' es muy corto y se parece a {riesgo}")
 
-    # Lo que no entra en el initial_prompt.
-    completo = "Vocabulario y términos técnicos relevantes: " + ", ".join(terms) + "."
+    # Lo que no entra en el initial_prompt. Se mide como lo arma la app: términos
+    # MÁS destinos de alias (build_initial_prompt(terms, aliases)).
+    vocabulario = list(terms) + [b for _m, b in aliases if b not in terms]
+    completo = "Vocabulario y términos técnicos relevantes: " + ", ".join(vocabulario) + "."
     if len(completo) > D.MAX_PROMPT_CHARS:
-        recortado = D.build_initial_prompt(terms)
-        dentro = recortado.count(",")
+        recortado = D.build_initial_prompt(terms, aliases)
+        dentro = recortado.count(",") + 1
         print(f"\n  El initial_prompt se recorta en {D.MAX_PROMPT_CHARS} de {len(completo)} "
               f"caracteres: solo los primeros ~{dentro} términos llegan al modelo como")
         print(f"  pista. Los demás siguen corrigiendo DESPUÉS, pero el modelo no los")
