@@ -140,6 +140,19 @@ de un segundo de espera. En CPU la cuenta cambia por completo — ahí `small` g
   los instaladores lo crean copiando `dictionary.example.txt`, que es la plantilla que
   sí está en el repo. Si `dictionary.txt` no existe, la app lee la plantilla.
 - **Ícono en la bandeja** — clic derecho → "Salir" para cerrar la app.
+
+### Herramientas de diagnóstico
+
+```
+python scripts/diagnostico_microfono.py   # ¿cuál de mis micrófonos me escucha?
+python scripts/auditar_diccionario.py     # ¿mi diccionario está empeorando el dictado?
+python scripts/bench_models.py --record   # ¿qué modelo acierta más con mi voz?
+```
+
+El audit del diccionario prueba tus términos **contra tu propio historial de
+dictados** y te dice cuáles estarían corrompiendo texto que ya estaba bien. Es el
+que más sorpresas da: un término mal elegido no falla de forma visible, simplemente
+reescribe frases correctas y parece que el modelo transcribe mal.
 - Casi cualquier otra cosa es una constante en `whisperflow/core/*.py` o una entrada
   del `.env`.
 

@@ -170,6 +170,22 @@ interfaz de hotkeys pero **ya nadie la usa** (era para las tone-keys de perfil).
   liberar `alt`, un pegado disparado por Ctrl+Alt+Z mandaría Ctrl+Alt+V (que no pega).
 - **`on_quit` usa `os._exit(0)`**: con hilos daemon + el mainloop de pystray, un
   apagado "limpio" colgaría la salida.
+- **El destino de un alias NO entra en la corrección difusa** (solo en el
+  `initial_prompt`). Agregarlo era una fuente silenciosa de destrozos: auditando un
+  diccionario real habían entrado así 27 términos que el usuario nunca escribió,
+  incluidos `son` (de `Soon => son`), `genera` y `dime si`. El alias ya hace el
+  reemplazo exacto; no debe además atraer texto parecido.
+- **Guardarraíl de frases comunes** (`es_frase_comun`): un término de varias palabras,
+  todo minúsculas y que empieza por palabra funcional se excluye de la corrección
+  difusa. Con `en seguida` en el diccionario, "en segundo lugar" salía "en seguida
+  lugar", y eso pasa los DOS filtros de similitud (global 0.800, por palabra 0.714).
+  **No se arregla subiendo umbrales**: `"wuspr floe" -> "Wispr Flow"`, que es una
+  corrección legítima, da 0.750 por palabra. Hay que excluir el término.
+- **El overlay avisa "sin señal del micrófono"** cuando el nivel no llega a
+  `SPEECH_FLOOR` durante 2 s grabando. Es solo lo que se DIBUJA; la máquina de estados
+  no cambia. Existe porque un micrófono mudo se veía exactamente igual que uno sano:
+  la app grababa y transcribía sin errores, sobre silencio, y Whisper alucinaba texto
+  repetido encima.
 - **El diccionario son DOS archivos**: `dictionary.example.txt` (plantilla, se
   versiona) y `dictionary.txt` (el del usuario, en `.gitignore`). El personal se
   llena de nombres de clientes y jerga propia y este repo es público. Si

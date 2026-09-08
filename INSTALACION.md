@@ -306,14 +306,46 @@ No debería pasar con el micrófono siempre armado. Si lo pusiste en
 `WHISPERFLOW_MIC_ALWAYS_ON=0`, vuelve a `1`: abrir el micrófono en el momento de
 pulsar cuesta más de 100 milisegundos y ahí se pierden las primeras sílabas.
 
-### Dice "no se detectó voz" aunque hablé
+### Dice "no se detectó voz" aunque hablé, o el indicador dice "sin señal del micrófono"
 
-El filtro que descarta audio mudo está siendo demasiado estricto para tu micrófono.
-Baja el umbral en `.env`:
+**Antes de tocar ningún ajuste, mide tu micrófono.** En la mayoría de los casos no es
+la app: es que el micrófono entrega demasiada poca señal.
+
+```
+python scripts/diagnostico_microfono.py
+```
+
+Habla sin parar mientras corre. Mide **todas** tus entradas y te dice cuál sirve, más
+el arreglo del portátil canal por canal. Buscas picos de **0.1–0.2**; por debajo de
+**0.05** la transcripción empieza a fallar aunque el texto salga.
+
+Si tu mejor micrófono no llega a ese nivel, el problema está en el sistema: revisa la
+tecla de silenciar micrófono del portátil (suele ser F4 u F8), Privacidad y seguridad
+→ Micrófono, el "Aumento de micrófono" en las propiedades del dispositivo, y desactiva
+las mejoras de audio, que a veces se comen la voz tratándola como ruido.
+
+Solo si el nivel es sano y aun así te rechaza el dictado, baja el umbral en `.env`:
 
 ```
 WHISPERFLOW_VAD_THRESHOLD=0.004
 ```
+
+### Transcribe mal, o cambia palabras que dije bien
+
+Puede ser el diccionario trabajando en tu contra. Un término mal elegido no falla de
+forma visible: **reescribe frases correctas** y parece que el modelo transcribe mal.
+
+```
+python scripts/auditar_diccionario.py
+```
+
+Prueba tu diccionario contra tu **propio historial de dictados** y te dice qué
+términos estarían corrompiendo texto que ya estaba bien, con nombre y frecuencia.
+
+La regla: los términos son para **nombres propios y jerga** que el modelo no conoce.
+Para cambiar una cosa concreta por otra, usa un alias (`mal => bien`), que es exacto y
+no se dispara por parecido. Nunca pongas como término una palabra corriente del
+idioma — atraerá hacia sí todas las que se le parezcan.
 
 ### Escribe cosas raras cuando no hablo
 
