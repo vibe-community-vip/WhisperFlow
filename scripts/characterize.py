@@ -64,6 +64,36 @@ def _cases():
     out["corrections(multi-fuzzy)"] = D.apply_dictionary_corrections("uso wuspr floe y claude kode", terms_multi)
     out["corrections(multi-prefix)"] = D.apply_dictionary_corrections("prueba faster whisper ahora", terms_multi)
 
+    # Falsos positivos de la corrección por frase: texto CORRECTO que no se debe tocar.
+    # Todos estos se destrozaban cuando el único filtro era la similitud global (0.68);
+    # los atrapa el chequeo palabra por palabra (WORD_ALIGN_THRESHOLD). Reproducen un
+    # caso real de uso diario, así que si alguien afloja ese filtro, esto lo avisa.
+    terms_fp = ["en seguida", "Claude Code", "Wispr Flow"]
+    out["corrections(fp-la-segunda)"] = D.apply_dictionary_corrections(
+        "la segunda idea es un curso", terms_fp)
+    out["corrections(fp-y-segunda)"] = D.apply_dictionary_corrections(
+        "y segunda cosa que quiero", terms_fp)
+    out["corrections(fp-es-segunda)"] = D.apply_dictionary_corrections(
+        "es segunda vez que pasa", terms_fp)
+    out["corrections(fp-claude-hace)"] = D.apply_dictionary_corrections(
+        "lo que Claude hace por mi", terms_fp)
+    # ...y la corrección legítima tiene que seguir ocurriendo con los MISMOS términos.
+    out["corrections(fp-sigue-corrigiendo)"] = D.apply_dictionary_corrections(
+        "uso wuspr floe a diario", terms_fp)
+
+    # Guardarraíl de frases comunes: un término como "en seguida" NO debe usarse para
+    # corregir. Caso real: convertía "en segundo lugar" en "en seguida lugar", y eso
+    # pasa los dos filtros de similitud (global 0.800, por palabra 0.714) — hace falta
+    # excluir el término, no ajustar umbrales.
+    out["es_frase_comun(en seguida)"] = D.es_frase_comun("en seguida")
+    out["es_frase_comun(de nuevo)"] = D.es_frase_comun("de nuevo")
+    out["es_frase_comun(prompt engineering)"] = D.es_frase_comun("prompt engineering")
+    out["es_frase_comun(Claude Code)"] = D.es_frase_comun("Claude Code")
+    out["es_frase_comun(large-v3 turbo)"] = D.es_frase_comun("large-v3 turbo")
+    out["es_frase_comun(RAG)"] = D.es_frase_comun("RAG")
+    out["corrections(guardarrail-en-segundo)"] = D.apply_dictionary_corrections(
+        "en segundo lugar quiero esto", ["en seguida"])
+
     # --- load_dictionary (parse sobre un archivo temporal controlado) ---
     sample = (
         "# diccionario de prueba\n"

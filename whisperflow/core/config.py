@@ -129,3 +129,9 @@ VAD_ENABLED = get_bool("WHISPERFLOW_VAD", True)
 VAD_THRESHOLD = float(get("WHISPERFLOW_VAD_THRESHOLD", "0.008"))   # RMS por trama (float32, 0..1)
 VAD_MIN_FRAMES = int(get("WHISPERFLOW_VAD_MIN_FRAMES", "3"))        # tramas mínimas sobre el umbral
 VAD_FRAME_MS = int(get("WHISPERFLOW_VAD_FRAME_MS", "30"))           # tamaño de trama de análisis
+
+# Pico por debajo del cual se avisa de audio flojo (no descarta nada, solo avisa).
+# Está muy por encima del umbral del VAD a propósito: entre 0.008 y 0.05 el dictado
+# SE TRANSCRIBE, pero mal, y esa franja es la que confunde — parece que el modelo es
+# malo cuando en realidad el micrófono está lejos o bajo.
+WEAK_SIGNAL_PEAK = float(get("WHISPERFLOW_WEAK_SIGNAL_PEAK", "0.05"))

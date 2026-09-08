@@ -41,9 +41,9 @@ PAD_LEFT, PAD_RIGHT = 15, 14
 DOT_R = 3.0                        # radio del punto sólido
 DOT_GLOW_R = 11.0                  # alcance del halo alrededor del punto
 TEXT_GAP = 11                      # separación punto -> texto
-BAR_COUNT = 5
-BAR_W, BAR_GAP = 2.0, 3.6
-BAR_MIN_H, BAR_MAX_H = 2.0, 15.0
+BAR_COUNT = 7          # más barras = se distingue mejor cuánta señal entra
+BAR_W, BAR_GAP = 2.6, 3.0
+BAR_MIN_H, BAR_MAX_H = 2.0, 17.0
 BARS_AREA_W = BAR_COUNT * BAR_W + (BAR_COUNT - 1) * BAR_GAP
 
 SS = 4           # supersampling: se dibuja a 4x y se reduce -> bordes suaves
@@ -65,12 +65,17 @@ STATE_COLOR = {
     "hands_free": (182, 167, 240),   # lavanda
     "processing": (239, 201, 138),   # ámbar
     "loading":    (154, 160, 166),   # gris
+    # El micrófono no entrega señal mientras grabás. Nace de un caso real: el
+    # arreglo de micrófonos del portátil dejó de captar y la app parecía "no
+    # funcionar" — grababa perfecto, pero silencio. El indicador no lo delataba.
+    "no_signal":  (240, 148, 138),   # rojo apagado
 }
 STATE_TEXT = {
     "recording":  "grabando",
     "hands_free": "manos libres",
     "processing": "procesando",
     "loading":    "cargando modelo",
+    "no_signal":  "sin señal del micrófono",
 }
 
 # Tipografía: fina y con tracking. Cada SO tiene su equivalente "semilight".
