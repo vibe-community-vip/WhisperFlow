@@ -8,6 +8,47 @@ y este proyecto se rige por [Versionado Semántico](https://semver.org/lang/es/)
 ## [Unreleased]
 
 ### Cambiado
+- **El indicador ahora se lee de un vistazo.** 7 barras en vez de 5, más anchas y
+  altas, y con **ataque rápido y caída lenta** como un medidor de audio real: el
+  suavizado simétrico anterior se comía los picos de voz y las barras casi no se
+  movían, que es justo lo que no dejaba distinguir "te escucho" de "no capto nada".
+- **El destino de un alias ya no dispara correcciones por parecido.** `load_dictionary`
+  metía el lado derecho de cada alias en la lista de corrección difusa; auditando un
+  diccionario real aparecieron **27 términos que el usuario nunca escribió**, entre
+  ellos `son` (de `Soon => son`), `genera`, `adjunta`, `leads` y `dime si` — palabras
+  corrientes del español convertidas en imanes, en silencio. El alias ya hace el
+  reemplazo exacto; no necesita además atraer texto parecido. La pista al modelo
+  (`initial_prompt`) sí sigue incluyéndolos, porque ahí son útiles e inofensivos.
+
+### Agregado
+- **Aviso "sin señal del micrófono"** en el indicador: si mientras grabás el nivel no
+  llega al mínimo durante 2 segundos, la cápsula pasa a rojo y lo dice. Nace de un
+  caso real en el que el micrófono del portátil dejó de captar: la app grababa,
+  transcribía y pegaba sin un solo error de código — solo que sobre silencio, y
+  Whisper alucinaba texto repetido encima. Nada en la interfaz lo delataba.
+- **Aviso de señal débil en cada dictado** (`WHISPERFLOW_WEAK_SIGNAL_PEAK`, default
+  `0.05`). Está muy por encima del umbral del VAD (`0.008`) a propósito: en esa franja
+  el audio **sí se transcribe**, pero mal, y uno acaba culpando al modelo o al
+  diccionario. Caso real: *"mucho margen de mejora"* salió como *"mucha más agente en
+  el fora"*.
+- **Guardarraíl contra términos que son frases comunes.** Con `en seguida` en el
+  diccionario, *"en segundo lugar"* salía *"en seguida lugar"* — y eso pasa los dos
+  filtros de similitud (global 0.800, por palabra 1.00 y 0.714). No hay umbral que lo
+  arregle sin perder correcciones legítimas: `"wuspr floe" → "Wispr Flow"` da 0.750
+  por palabra. Un término de varias palabras, todo en minúsculas y que empieza por
+  palabra funcional se excluye de la corrección (avisando una vez por consola).
+- **`scripts/diagnostico_microfono.py`**: mide todas las entradas del sistema con la
+  misma voz y dice cuál sirve, más el arreglo del portátil canal por canal. Si
+  ninguna llega a nivel de dictado, lista las causas a revisar.
+- **`scripts/auditar_diccionario.py`**: revisión estructural del diccionario (alias en
+  conflicto, grafías que se anulan entre sí, términos que son palabras comunes,
+  recorte de la pista) y —lo que de verdad encuentra cosas— prueba el diccionario
+  contra el historial de dictados del propio usuario, reportando cada cambio que
+  haría sobre texto que ya estaba bien.
+
+## [1.1.0] — sin publicar
+
+### Cambiado
 - **Indicador flotante rediseñado.** Se dibuja con Pillow
   (`core/overlay_render.py`) en lugar de primitivas de `tkinter.Canvas`: cápsula con
   degradado vertical, borde tenue (el color de estado al 13 % en vez de una línea

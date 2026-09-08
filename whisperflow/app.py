@@ -177,8 +177,18 @@ class Application:
                       flush=True)
                 self.beep.no_speech()
                 return
+            # Aviso de señal débil. Whisper no falla "un poco" con audio flojo: falla
+            # feo y con seguridad — "mucho margen de mejora" salió como "mucha más
+            # agente en el fora" (caso real). Sin esto, el usuario culpa al modelo o
+            # al diccionario, que es donde se pierde el tiempo. Un dictado sano da
+            # picos de 0.1-0.2; por debajo de 0.05 la calidad se cae en picada.
+            if v["peak"] < config.WEAK_SIGNAL_PEAK:
+                print(f"[whisperflow] AVISO: señal débil (pico {v['peak']:.3f}, sano "
+                      f">= {config.WEAK_SIGNAL_PEAK}). Acercate al micrófono o subí su "
+                      f"nivel; con este audio la transcripción va a fallar.", flush=True)
+
             terms, aliases = load_dictionary()
-            initial_prompt = build_initial_prompt(terms)
+            initial_prompt = build_initial_prompt(terms, aliases)
             text = asr.transcribe(audio, initial_prompt=initial_prompt)
             # Última red contra el crédito de Amara.org que Whisper alucina sobre
             # audio casi mudo (ver core/hallucinations.py).

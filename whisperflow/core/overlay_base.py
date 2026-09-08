@@ -32,6 +32,20 @@ KEY_COLOR_HEX = "#%02x%02x%02x" % render.KEY_COLOR
 FRAME_MS = 33            # ~30 fps: el blit de una imagen de 236x34 cuesta ~0.04 ms
 BOTTOM_MARGIN = 110      # distancia desde el borde inferior de la pantalla
 
+# --- Aviso de "sin señal" ---------------------------------------------------
+# Si mientras grabás el micrófono no entrega nada, el indicador lo dice en vez de
+# fingir que todo va bien. Nace de un caso real: el micrófono del portátil dejó de
+# captar, la app grababa y transcribía sin errores... silencio, y el usuario solo
+# veía "grabando" con las barras quietas. Whisper encima alucinaba texto repetido
+# sobre ese silencio, así que el fallo se veía como "transcribe cualquier cosa".
+#
+# SPEECH_FLOOR está en la escala de ``recorder.current_mic_level`` (rms*9 acotado a
+# 1.0). El umbral del VAD es 0.008 de RMS, que en esa escala son ~0.072; se usa algo
+# por debajo para no acusar en falso a quien habla bajito.
+SPEECH_FLOOR = 0.045
+SILENT_SECONDS = 2.0     # hay que estar así de tiempo callado antes de avisar
+_SILENT_FRAMES = int(SILENT_SECONDS * 1000 / FRAME_MS)
+
 
 class OverlayBackend(ABC):
     """Indicador flotante. Corre con su propio Tk; los comandos llegan por cola
@@ -120,7 +134,7 @@ class TkOverlayBase(OverlayBackend):
         root.update_idletasks()
         root.withdraw()
 
-        state = {"name": "loading", "visible": False, "tick": 0}
+        state = {"name": "loading", "visible": False, "tick": 0, "silent": 0}
         levels = [0.0] * render.BAR_COUNT
 
         def poll():
@@ -135,6 +149,7 @@ class TkOverlayBase(OverlayBackend):
                     elif cmd == "hide" and state["visible"]:
                         root.withdraw()
                         state["visible"] = False
+                        state["silent"] = 0
                         for i in range(render.BAR_COUNT):
                             levels[i] = 0.0
             except _queue.Empty:
@@ -144,16 +159,30 @@ class TkOverlayBase(OverlayBackend):
                 state["tick"] += 1
                 tick = state["tick"]
                 name = state["name"]
-                if name in ("recording", "hands_free"):
+                grabando = name in ("recording", "hands_free")
+                if grabando:
                     target = recorder.current_mic_level
+                    # Contar cuánto lleva el micrófono sin entregar nada.
+                    if target < SPEECH_FLOOR:
+                        state["silent"] += 1
+                    else:
+                        state["silent"] = 0
+                    if state["silent"] >= _SILENT_FRAMES:
+                        name = "no_signal"      # solo lo que se DIBUJA; el estado real no cambia
                 elif name == "processing":
                     target = 0.35 + 0.25 * math.sin(tick * 0.20)   # pulso, no hay mic en vivo
                 else:
                     target = 0.0
+
                 for i in range(render.BAR_COUNT):
                     wobble = 0.72 + 0.28 * math.sin(tick * 0.30 + i * 0.9)  # da vida a cada barra
                     goal = min(1.0, target * wobble)
-                    levels[i] += (goal - levels[i]) * 0.30                  # suaviza
+                    # Ataque rápido y caída lenta, como un medidor de audio de verdad:
+                    # con un suavizado simétrico los picos de voz se perdían y las
+                    # barras apenas se movían, que es justo lo que no dejaba ver si el
+                    # micrófono estaba captando.
+                    factor = 0.65 if goal > levels[i] else 0.18
+                    levels[i] += (goal - levels[i]) * factor
                 dot_step = int(1.5 + 1.5 * math.sin(tick * 0.13))           # el punto respira
                 photo.paste(self._renderer.frame(name, levels, dot_step))
             root.after(FRAME_MS, poll)
