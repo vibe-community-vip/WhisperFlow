@@ -10,6 +10,11 @@ Tres mecanismos, igual que Wispr Flow y apps similares:
      no exacto a un término, se reemplaza por la grafía correcta (comparando
      similitud de texto, tolera errores fonéticos leves).
 
+Los tres NO usan la misma lista. La pista (1) incluye términos **y** destinos de
+alias, porque ahí sumar vocabulario es gratis. La corrección difusa (3) usa **solo
+los términos escritos explícitamente**: un destino de alias no debe disparar
+reemplazos por parecido, y meterlos era una fuente silenciosa de texto destrozado.
+
 **Dos archivos, a propósito**: ``dictionary.example.txt`` es la plantilla que se
 versiona, y ``dictionary.txt`` es el diccionario real del usuario, que NO se versiona
 (está en ``.gitignore``). El diccionario personal se llena de nombres de clientes,
@@ -123,8 +128,15 @@ def load_dictionary():
                     wrong, correct = wrong.strip(), correct.strip()
                     if wrong and correct:
                         aliases.append((wrong, correct))
-                        if correct not in terms:
-                            terms.append(correct)
+                        # OJO: el destino del alias NO se agrega a ``terms``. Antes sí,
+                        # y era una fuente silenciosa de destrozos: el alias ya hace el
+                        # reemplazo exacto, pero al colarse en la corrección difusa el
+                        # destino empezaba a atraer texto parecido. Auditando un
+                        # diccionario real, 27 términos habían entrado así sin que el
+                        # usuario los escribiera nunca — incluidos "son" (de
+                        # "Soon => son"), "genera", "adjunta", "leads" y "dime si", todas
+                        # palabras corrientes del español. Si querés que un destino
+                        # TAMBIÉN se corrija por parecido, escribilo aparte como término.
                 elif line not in terms:
                     terms.append(line)
     except Exception as e:
@@ -140,10 +152,19 @@ def load_dictionary():
     return terms, aliases
 
 
-def build_initial_prompt(terms):
-    if not terms:
+def build_initial_prompt(terms, aliases=()):
+    """Pista de vocabulario para el modelo.
+
+    Incluye los destinos de los alias además de los términos: como pista son útiles
+    (le dicen al modelo qué palabras esperar) y son inofensivos, a diferencia de la
+    corrección difusa, de la que se los excluye a propósito (ver ``load_dictionary``)."""
+    vocabulario = list(terms)
+    for _mal, bien in aliases:
+        if bien not in vocabulario:
+            vocabulario.append(bien)
+    if not vocabulario:
         return None
-    prompt = "Vocabulario y términos técnicos relevantes: " + ", ".join(terms) + "."
+    prompt = "Vocabulario y términos técnicos relevantes: " + ", ".join(vocabulario) + "."
     return prompt[:MAX_PROMPT_CHARS]
 
 

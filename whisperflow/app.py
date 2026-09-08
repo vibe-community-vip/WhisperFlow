@@ -188,7 +188,7 @@ class Application:
                       f"nivel; con este audio la transcripción va a fallar.", flush=True)
 
             terms, aliases = load_dictionary()
-            initial_prompt = build_initial_prompt(terms)
+            initial_prompt = build_initial_prompt(terms, aliases)
             text = asr.transcribe(audio, initial_prompt=initial_prompt)
             # Última red contra el crédito de Amara.org que Whisper alucina sobre
             # audio casi mudo (ver core/hallucinations.py).

@@ -94,6 +94,13 @@ def _cases():
     out["corrections(guardarrail-en-segundo)"] = D.apply_dictionary_corrections(
         "en segundo lugar quiero esto", ["en seguida"])
 
+    # El destino de un alias NO entra en la corrección difusa (sí en la pista). Con
+    # "Soon => son", "son" se volvía objetivo difuso y capturaba texto normal; en un
+    # diccionario real habían entrado así 27 términos que el usuario nunca escribió.
+    out["build_initial_prompt(con-alias)"] = D.build_initial_prompt(
+        ["Claude"], [("clod", "Claude"), ("SAS", "SaaS")])
+    out["build_initial_prompt(sin-alias)"] = D.build_initial_prompt(["Claude"])
+
     # --- load_dictionary (parse sobre un archivo temporal controlado) ---
     sample = (
         "# diccionario de prueba\n"
