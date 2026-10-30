@@ -6,13 +6,14 @@ así que ``-alpha`` es seguro. Igual que en Mac: esquinas cuadradas, porque sin
 colorkey no hay forma de transparentar el área fuera de la cápsula. Divergencia
 visual aceptada.
 """
+from whisperflow.core import config
 from whisperflow.core import overlay_base as ob
 
 
 class LinuxOverlayBackend(ob.TkOverlayBase):
     def _configure_window(self, root, tk):
         try:
-            root.attributes("-alpha", 0.96)
+            root.attributes("-alpha", config.OVERLAY_OPACITY)
         except Exception:
             pass
         try:

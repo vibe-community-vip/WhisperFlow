@@ -19,7 +19,7 @@ pre-renderizados (barras y punto). Ver ``OverlayRenderer.frame``.
 
 La imagen se devuelve en RGB **aplanada sobre ``KEY_COLOR``**, que en Windows es el
 color que ``-transparentcolor`` vuelve invisible (de ahí las esquinas redondeadas
-sin ``-alpha``). En Mac/Linux el backend usa ``-alpha`` y el mismo KEY_COLOR de fondo.
+; la opacidad la pone ``-alpha`` encima). En Mac/Linux el backend usa ``-alpha`` y el mismo KEY_COLOR de fondo.
 
 **Por qué KEY_COLOR es casi negro y no magenta**: el colorkey de Windows solo borra
 los píxeles *exactamente* iguales al color clave. El borde redondeado es
