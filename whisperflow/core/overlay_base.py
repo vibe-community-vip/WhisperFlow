@@ -10,16 +10,17 @@ de ``tkinter.Canvas`` (tres copias que había que mantener sincronizadas). Ahora
 backend de cada SO solo aporta lo que de verdad cambia entre sistemas: cómo se crea
 y se hace transparente la ventana (``_configure_window``).
 
-  - Windows: ``-transparentcolor`` (colorkey) + ``WS_EX_NOACTIVATE``. NUNCA
-    ``-alpha``: rompe el ClearType de Windows. Como el texto ahora lo rasteriza
-    Pillow y no Tk, el colorkey es la única razón que queda para evitar ``-alpha``.
-  - Mac/Linux: ``-alpha`` (ahí no hay colorkey ni ClearType).
+  - Windows: ``-transparentcolor`` (colorkey, esquinas redondeadas) + ``-alpha``
+    (opacidad) + ``WS_EX_NOACTIVATE``/``WS_EX_TRANSPARENT``. Windows aplica colorkey
+    y alpha a la vez; el texto lo rasteriza Pillow, así que no hay ClearType que romper.
+  - Mac/Linux: ``-alpha`` (ahí no hay colorkey).
 """
 import math
 import queue as _queue
 import threading
 from abc import ABC, abstractmethod
 
+from whisperflow.core import config
 from whisperflow.core import overlay_render as render
 from whisperflow.core import recorder
 
@@ -30,7 +31,10 @@ PILL_H = render.PILL_H
 KEY_COLOR_HEX = "#%02x%02x%02x" % render.KEY_COLOR
 
 FRAME_MS = 33            # ~30 fps: el blit de una imagen de 236x34 cuesta ~0.04 ms
-BOTTOM_MARGIN = 110      # distancia desde el borde inferior de la pantalla
+BOTTOM_MARGIN = 110      # distancia desde el borde inferior de la pantalla (modo "bottom")
+CURSOR_GAP = 22          # px entre la punta del puntero y el borde inferior de la cápsula
+CURSOR_BELOW = 30        # si no cabe encima (puntero pegado arriba), va debajo: salta el puntero
+EDGE_MARGIN = 8          # nunca pegada al borde del monitor
 
 # --- Aviso de "sin señal" ---------------------------------------------------
 # Si mientras grabás el micrófono no entrega nada, el indicador lo dice en vez de
@@ -45,6 +49,17 @@ BOTTOM_MARGIN = 110      # distancia desde el borde inferior de la pantalla
 SPEECH_FLOOR = 0.045
 SILENT_SECONDS = 2.0     # hay que estar así de tiempo callado antes de avisar
 _SILENT_FRAMES = int(SILENT_SECONDS * 1000 / FRAME_MS)
+
+# --- Pausas al hablar --------------------------------------------------------
+# El aviso de arriba solo tiene sentido si el micrófono NUNCA entregó voz en este
+# dictado. Si ya se oyó voz y después hay silencio, es una pausa (p. ej. leyendo
+# algo en voz alta): en vez de "sin señal", la cápsula se desvanece hasta
+# OVERLAY_PAUSE_OPACITY para no tapar lo que se lee, con el punto aún respirando
+# para que se note que sigue grabando. Al volver a hablar recupera la opacidad.
+PAUSE_SECONDS = 1.2
+_PAUSE_FRAMES = int(PAUSE_SECONDS * 1000 / FRAME_MS)
+FADE_OUT_STEP = 0.04     # por frame: desvanecerse tarda ~0.4 s, sin sobresalto
+FADE_IN_STEP = 0.25      # volver al hablar es casi inmediato
 
 
 class OverlayBackend(ABC):
@@ -80,6 +95,28 @@ class TkOverlayBase(OverlayBackend):
     def _configure_window(self, root, tk) -> None:
         """Aplica la transparencia y los flags de ventana propios del SO.
         Se llama con la ventana ya dimensionada y posicionada, antes de mostrarla."""
+
+    def _work_area(self, root, x, y):
+        """(izq, arriba, der, abajo) del área útil del monitor que contiene (x, y).
+        Default: la pantalla principal entera; Windows lo afina por monitor."""
+        return 0, 0, root.winfo_screenwidth(), root.winfo_screenheight()
+
+    def _place(self, root):
+        """Posición de la cápsula al aparecer. Se calcula una vez por dictado: si
+        siguiera al puntero mientras grabás, se movería bajo la vista y distrae."""
+        if config.OVERLAY_POSITION == "bottom":
+            sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
+            root.geometry(f"+{(sw - PILL_W) // 2}+{sh - BOTTOM_MARGIN}")
+            return
+        px, py = root.winfo_pointerxy()
+        left, top, right, bottom = self._work_area(root, px, py)
+        x = px - PILL_W // 2
+        y = py - CURSOR_GAP - PILL_H
+        if y < top + EDGE_MARGIN:                 # no cabe encima: debajo del puntero
+            y = py + CURSOR_BELOW
+        x = max(left + EDGE_MARGIN, min(x, right - EDGE_MARGIN - PILL_W))
+        y = max(top + EDGE_MARGIN, min(y, bottom - EDGE_MARGIN - PILL_H))
+        root.geometry(f"+{x}+{y}")
 
     # --- API pública ---
     def start(self):
@@ -134,8 +171,18 @@ class TkOverlayBase(OverlayBackend):
         root.update_idletasks()
         root.withdraw()
 
-        state = {"name": "loading", "visible": False, "tick": 0, "silent": 0}
+        state = {"name": "loading", "visible": False, "tick": 0, "silent": 0,
+                 "heard": False, "alpha": config.OVERLAY_OPACITY}
         levels = [0.0] * render.BAR_COUNT
+
+        def set_alpha(value):
+            if abs(value - state["alpha"]) < 0.005:
+                return
+            state["alpha"] = value
+            try:
+                root.attributes("-alpha", value)
+            except Exception:
+                pass
 
         def poll():
             try:
@@ -144,12 +191,18 @@ class TkOverlayBase(OverlayBackend):
                     if cmd == "show":
                         state["name"] = payload
                         if not state["visible"]:
+                            try:
+                                self._place(root)
+                            except Exception as e:   # posicionar nunca debe impedir mostrarla
+                                print(f"[whisperflow] overlay sin reposicionar ({e})", flush=True)
+                            set_alpha(config.OVERLAY_OPACITY)
                             root.deiconify()
                             state["visible"] = True
                     elif cmd == "hide" and state["visible"]:
                         root.withdraw()
                         state["visible"] = False
                         state["silent"] = 0
+                        state["heard"] = False
                         for i in range(render.BAR_COUNT):
                             levels[i] = 0.0
             except _queue.Empty:
@@ -160,6 +213,7 @@ class TkOverlayBase(OverlayBackend):
                 tick = state["tick"]
                 name = state["name"]
                 grabando = name in ("recording", "hands_free")
+                alpha_goal = config.OVERLAY_OPACITY
                 if grabando:
                     target = recorder.current_mic_level
                     # Contar cuánto lleva el micrófono sin entregar nada.
@@ -167,12 +221,21 @@ class TkOverlayBase(OverlayBackend):
                         state["silent"] += 1
                     else:
                         state["silent"] = 0
-                    if state["silent"] >= _SILENT_FRAMES:
+                        state["heard"] = True
+                    if state["heard"]:
+                        if state["silent"] >= _PAUSE_FRAMES:
+                            alpha_goal = min(alpha_goal, config.OVERLAY_PAUSE_OPACITY)
+                    elif state["silent"] >= _SILENT_FRAMES:
                         name = "no_signal"      # solo lo que se DIBUJA; el estado real no cambia
                 elif name == "processing":
                     target = 0.35 + 0.25 * math.sin(tick * 0.20)   # pulso, no hay mic en vivo
                 else:
                     target = 0.0
+
+                if alpha_goal < state["alpha"]:
+                    set_alpha(max(alpha_goal, state["alpha"] - FADE_OUT_STEP))
+                elif alpha_goal > state["alpha"]:
+                    set_alpha(min(alpha_goal, state["alpha"] + FADE_IN_STEP))
 
                 for i in range(render.BAR_COUNT):
                     wobble = 0.72 + 0.28 * math.sin(tick * 0.30 + i * 0.9)  # da vida a cada barra

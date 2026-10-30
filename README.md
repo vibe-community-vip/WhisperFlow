@@ -33,8 +33,9 @@ El dictado es **uno solo, sin modos**: lo que dictas es lo que se pega. (Hubo
 perfiles de tono "amigable"/"profesional" que reescribían el texto con un LLM; se
 quitaron para dejar la herramienta simple y predecible.)
 
-Un indicador flotante aparece abajo al centro mientras grabas/transcribes: una
-cápsula translúcida con degradado, halo de luz y un mini-ecualizador que reacciona a
+Un indicador flotante aparece justo encima del puntero del ratón mientras
+grabas/transcribes (semitransparente, para que se lea lo que queda detrás, y los
+clics lo atraviesan): una cápsula con degradado, halo de luz y un mini-ecualizador que reacciona a
 tu voz.
 
 **El micrófono queda armado desde que arranca la app.** Abrirlo en el momento de

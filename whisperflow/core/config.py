@@ -92,6 +92,17 @@ PREROLL_MS = int(get("WHISPERFLOW_PREROLL_MS", "350"))
 # al instante. 0 = bip inmediato (vuelven a oírse dos tonos al entrar a manos libres).
 HANDSFREE_GRACE_MS = int(get("WHISPERFLOW_HANDSFREE_GRACE_MS", "220"))
 
+# --- Indicador flotante ---
+# cursor = aparece justo encima del puntero del ratón (donde estás trabajando);
+# bottom = abajo al centro de la pantalla, como antes.
+OVERLAY_POSITION = get("WHISPERFLOW_OVERLAY_POSITION", "cursor").strip().lower()
+# Opacidad de la cápsula (0.2–1.0). Menos de 1 deja leer el texto que queda detrás.
+OVERLAY_OPACITY = min(1.0, max(0.2, float(get("WHISPERFLOW_OVERLAY_OPACITY", "0.88"))))
+# Opacidad durante una pausa al hablar (ya se oyó voz y llevás >1.2 s callado):
+# la cápsula se desvanece para no tapar lo que estés leyendo, pero no desaparece,
+# así se sigue viendo que está grabando. 0.08–1.0.
+OVERLAY_PAUSE_OPACITY = min(1.0, max(0.08, float(get("WHISPERFLOW_OVERLAY_PAUSE_OPACITY", "0.25"))))
+
 # --- Debug ---
 DEBUG = get_bool("WHISPERFLOW_DEBUG", False)
 

@@ -15,6 +15,7 @@ sobreescribe ``start``/``run_mainloop`` en vez de usar el hilo propio de la base
   - ``run_mainloop()`` corre ``root.mainloop()`` bloqueando el hilo principal,
     mientras pystray corre ``run_detached()`` en el suyo.
 """
+from whisperflow.core import config
 from whisperflow.core import overlay_base as ob
 
 
@@ -28,6 +29,6 @@ class MacOSOverlayBackend(ob.TkOverlayBase):
 
     def _configure_window(self, root, tk):
         try:
-            root.attributes("-alpha", 0.96)   # Mac permite -alpha (sin problema ClearType)
+            root.attributes("-alpha", config.OVERLAY_OPACITY)   # Mac permite -alpha
         except Exception:
             pass

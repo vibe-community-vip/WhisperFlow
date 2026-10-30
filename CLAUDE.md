@@ -90,10 +90,18 @@ interfaz de hotkeys pero **ya nadie la usa** (era para las tone-keys de perfil).
   Pillow en escala de grises, lo que esquiva el problema de ClearType y permite
   pesos finos + *tracking*. Costo medido: ~0.04 ms por frame (fondo y sprites
   cacheados por estado); la animación corre a 30 fps solo mientras es visible.
-- **El overlay de Windows NUNCA usa `-alpha`**: es incompatible con
-  `-transparentcolor`, que es lo único que da las esquinas redondeadas.
-  **Mac/Linux sí usan `-alpha`** (allí no existe colorkey): por eso sus overlays
-  tienen **esquinas cuadradas**.
+- **El overlay de Windows combina `-transparentcolor` y `-alpha`**: el colorkey da
+  las esquinas redondeadas y `-alpha` (`WHISPERFLOW_OVERLAY_OPACITY`, default 0.88)
+  deja ver el texto de detrás. Tk pasa ambos a `SetLayeredWindowAttributes`
+  (`LWA_COLORKEY|LWA_ALPHA`) y Windows aplica los dos — verificado con captura real
+  (antes se creía incompatible y se evitaba `-alpha`). **Mac/Linux** usan solo
+  `-alpha` (allí no existe colorkey): por eso sus overlays tienen **esquinas cuadradas**.
+- **El overlay aparece encima del puntero del ratón** (`WHISPERFLOW_OVERLAY_POSITION=
+  cursor`; `bottom` = abajo al centro, el comportamiento viejo). La posición se fija
+  al aparecer (no sigue al puntero mientras grabás: distrae), se acota al área útil
+  del monitor donde está el puntero, y si no cabe encima va debajo. En Windows lleva
+  `WS_EX_TRANSPARENT` en el marco de nivel superior (`GetAncestor(winfo_id, GA_ROOT)`,
+  no `winfo_id()`, que es la ventana hija): los clics la atraviesan.
 - **El color-key es un casi-negro `(1,0,1)`, no magenta.** El colorkey de Windows
   borra solo los píxeles *exactamente* iguales al color clave, y el borde redondeado
   es antialiaseado: sus píxeles son mezclas entre la píldora y el fondo sobre el que
@@ -185,7 +193,11 @@ interfaz de hotkeys pero **ya nadie la usa** (era para las tone-keys de perfil).
   `SPEECH_FLOOR` durante 2 s grabando. Es solo lo que se DIBUJA; la máquina de estados
   no cambia. Existe porque un micrófono mudo se veía exactamente igual que uno sano:
   la app grababa y transcribía sin errores, sobre silencio, y Whisper alucinaba texto
-  repetido encima.
+  repetido encima. **Solo si en ese dictado todavía no se oyó voz**: si ya se oyó y
+  luego hay >1.2 s de silencio es una pausa (leyendo algo), y en vez del aviso la
+  cápsula se desvanece a `WHISPERFLOW_OVERLAY_PAUSE_OPACITY` (0.25) para no tapar lo
+  que se lee; vuelve a la opacidad normal en cuanto se habla. Antes las pausas al
+  leer disparaban el aviso a cada rato.
 - **El diccionario son DOS archivos**: `dictionary.example.txt` (plantilla, se
   versiona) y `dictionary.txt` (el del usuario, en `.gitignore`). El personal se
   llena de nombres de clientes y jerga propia y este repo es público. Si
